@@ -42,9 +42,17 @@ GO_REQSERVING_E2E_RECIPE=CGO_ENABLED=1 $(GO) test $(GO_GCFLAGS) -tags reqserving
 
 OUT_DIR ?= bin
 
-# run the HO locally
-HYPERSHIFT_INSTALL_AWS := ./hack/dev/aws/hypershft-install-aws.sh
-RUN_OPERATOR_LOCALLY_AWS := ./hack/dev/aws/run-operator-locally-aws-dev.sh
+# Development scripts
+# Common scripts (shared utilities)
+STOP_OPERATOR_SCRIPT := ./hack/dev/common/stop-operator.sh
+UNINSTALL_HYPERSHIFT_SCRIPT := ./hack/dev/common/uninstall-hypershift.sh
+VALIDATE_OPERATOR_SCRIPT := ./hack/dev/common/validate-local-operator.sh
+
+# AWS-specific scripts
+AWS_INSTALL_HYPERSHIFT_SCRIPT := ./hack/dev/aws/install-hypershift.sh
+AWS_START_OPERATOR_SCRIPT := ./hack/dev/aws/start-operator.sh
+AWS_CREATE_CLUSTER_SCRIPT := ./hack/dev/aws/create-cluster.sh
+AWS_DESTROY_CLUSTER_SCRIPT := ./hack/dev/aws/destroy-cluster.sh
 
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
@@ -353,13 +361,66 @@ regenerate-pki:
 	REGENERATE_PKI=1 $(GO) test ./control-plane-pki-operator/...
 	REGENERATE_PKI=1 $(GO) test ./test/e2e/... -run TestRegeneratePKI
 
-.PHONY: hypershift-install-aws-dev
-hypershift-install-aws-dev:
-	@$(HYPERSHIFT_INSTALL_AWS)
+# Local operator development targets
+PID_FILE := .local-operator.pid
+LOG_FILE := /tmp/hypershift-operator-local-$(shell date +%Y%m%d-%H%M%S).log
 
-.PHONY: run-operator-locally-aws-dev
-run-operator-locally-aws-dev:
-	@$(RUN_OPERATOR_LOCALLY_AWS)
+# HyperShift installation tracking
+INSTALL_MANIFEST_TRACKER := .hypershift-install.yaml
+
+.PHONY: install-hypershift-development
+install-hypershift-development: ## Install HyperShift in development mode with OIDC configuration
+	@$(AWS_INSTALL_HYPERSHIFT_SCRIPT)
+
+.PHONY: uninstall-hypershift-development
+uninstall-hypershift-development: ## Uninstall HyperShift development installation
+	@$(UNINSTALL_HYPERSHIFT_SCRIPT)
+
+.PHONY: start-operator-locally
+start-operator-locally: ## Start HyperShift operator locally in background
+	@$(AWS_START_OPERATOR_SCRIPT)
+
+.PHONY: stop-operator-locally
+stop-operator-locally: ## Stop local HyperShift operator
+	@$(STOP_OPERATOR_SCRIPT)
+
+.PHONY: validate-local-operator
+validate-local-operator: start-operator-locally ## Validate local operator is working correctly
+	@echo "Running validation tests..."
+	@sleep 3
+	@./hack/dev/common/validate-local-operator.sh
+
+.PHONY: test-local-operator
+test-local-operator: validate-local-operator ## Run full local operator test (starts, validates, stops)
+	@$(MAKE) stop-operator-locally
+
+# Test cluster creation targets
+TEST_CLUSTER_INFO := .test-cluster.info
+
+.PHONY: create-test-cluster-local
+create-test-cluster-local: ## Create a test HostedCluster to verify local operator can reconcile cluster creation
+	@$(AWS_CREATE_CLUSTER_SCRIPT)
+
+.PHONY: destroy-test-cluster-local
+destroy-test-cluster-local: ## Destroy the test HostedCluster
+	@$(AWS_DESTROY_CLUSTER_SCRIPT)
+
+.PHONY: test-local-operator-with-cluster-creation
+test-local-operator-with-cluster-creation: start-operator-locally ## Full test: start operator, create cluster, validate, destroy, stop
+	@echo "=== Full Local Operator Test with Cluster Creation ==="
+	@echo ""
+	@$(MAKE) create-test-cluster-local
+	@echo ""
+	@echo "Waiting 90 seconds for operator to begin reconciliation..."
+	@sleep 90
+	@echo ""
+	@$(MAKE) validate-local-operator
+	@echo ""
+	@echo "=== Cleaning Up ==="
+	@$(MAKE) destroy-test-cluster-local
+	@$(MAKE) stop-operator-locally
+	@echo ""
+	@echo "✓ Full test with cluster creation completed"
 
 .PHONY: verify-codespell
 verify-codespell: codespell ## Verify codespell.

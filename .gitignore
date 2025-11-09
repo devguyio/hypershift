@@ -42,8 +42,8 @@ tools/bin
 # Mocked interface generate through mockgen
 *_mock.go
 
-# dev
-dev/
+# dev (top-level only, not hack/dev)
+/dev/
 
 # Python
 __pycache__/
@@ -54,3 +54,7 @@ __pycache__/
 .venv/
 venv/
 *.egg
+# Local operator development
+.local-operator.pid
+.test-cluster.info
+.hypershift-install.yaml

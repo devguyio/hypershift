@@ -67,10 +67,15 @@ make update                   # Full update (api-deps, workspace-sync, deps, api
 
 ### Development Workflow
 ```bash
-make hypershift-install-aws-dev       # Install HyperShift for AWS development
-make run-operator-locally-aws-dev     # Run operator locally for AWS development
+# Local operator development (recommended)
+make install-hypershift-development   # Install HyperShift in development mode with OIDC
+make start-operator-locally          # Start operator locally in background
+make validate-local-operator         # Validate operator is working
+make stop-operator-locally           # Stop local operator
+
+# Alternative: Manual commands
 bin/hypershift install --development # Install in development mode
-bin/hypershift-operator run          # Run operator locally
+bin/hypershift-operator run          # Run operator manually
 ```
 
 ## Testing Strategy

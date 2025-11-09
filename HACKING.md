@@ -17,23 +17,279 @@ What do I need to do to test...
 
 ### How to run the HyperShift Operator in a local process
 
-1. Ensure the `KUBECONFIG` environment variable points to a management cluster
-   with no HyperShift installed yet.
+#### Prerequisites
 
-2. Build HyperShift.
+- Go 1.22+ installed
+- `make` and `gcc` installed (for building)
+- `KUBECONFIG` pointing to an OpenShift 4.12+ or compatible Kubernetes management cluster with admin access
+- Management cluster either:
+  - Has no HyperShift installed yet, OR
+  - Has existing HyperShift installation (you'll scale down the operator)
+- **Telepresence** installed (required for DNS resolution of cluster-internal `.svc` addresses)
 
-        # requires go v1.22+
+#### Installing Telepresence
+
+The local operator needs to connect to cluster-internal services (e.g., `kube-apiserver.*.svc`) which use Kubernetes DNS. Telepresence routes your local DNS queries through the cluster.
+
+**Install Telepresence:**
+
+On Linux:
+```bash
+# Download and install
+sudo curl -fL https://app.getambassador.io/download/tel2/linux/amd64/latest/telepresence -o /usr/local/bin/telepresence
+sudo chmod a+x /usr/local/bin/telepresence
+```
+
+On macOS:
+```bash
+brew install datawire/blackbird/telepresence
+```
+
+**Connect to the cluster:**
+
+Before starting the local operator, establish a Telepresence connection:
+
+```bash
+telepresence connect
+```
+
+You should see output like:
+```
+Connected to context <your-context> (https://...)
+```
+
+**Verify DNS resolution works:**
+
+```bash
+# Test that .svc DNS resolution works
+nslookup kubernetes.default.svc.cluster.local
+# Should return an IP address, not "server can't find"
+```
+
+**When finished, disconnect:**
+
+```bash
+telepresence quit
+```
+
+#### Environment Configuration
+
+For easier management of environment variables, you can use a `.envrc` file:
+
+1. Copy the sample file:
+   ```bash
+   cp hack/dev/common/envrc.sample .envrc
+   ```
+
+2. Edit `.envrc` with your values:
+   ```bash
+   vim .envrc
+   ```
+
+3. Load the environment variables:
+   ```bash
+   source .envrc
+   ```
+
+**Optional: Use direnv for auto-loading**
+
+[direnv](https://direnv.net/) automatically loads `.envrc` when you enter the directory:
+
+```bash
+# Install direnv (optional)
+# Linux:
+curl -sfL https://direnv.net/install.sh | bash
+
+# macOS:
+brew install direnv
+
+# Allow direnv to load .envrc:
+direnv allow
+```
+
+Now environment variables will auto-load when you `cd` into the repository.
+
+#### Steps
+
+**IMPORTANT**: Ensure `KUBECONFIG` environment variable is set to your management cluster:
+
+        $ export KUBECONFIG=/path/to/your/management/cluster/kubeconfig
+
+1. Build HyperShift binaries:
+
         $ make build
 
-3. Install HyperShift in development mode which causes the operator deployment
-   to be deployment scaled to zero so that it doesn't conflict with your local
-   operator process.
+2. Prepare the management cluster:
 
-        $ bin/hypershift install --development
+   **Option A: Clean cluster (no HyperShift installed)**
 
-4. Run the HyperShift operator locally.
+   Using the make target (recommended - includes OIDC configuration):
 
-        $ bin/hypershift-operator run
+        $ make install-hypershift-development
+
+   Or manually:
+
+        $ bin/hypershift install --development \
+            --oidc-storage-provider-s3-bucket-name="${BUCKET_NAME}" \
+            --oidc-storage-provider-s3-credentials="${AWS_CREDS}" \
+            --oidc-storage-provider-s3-region="${REGION}" \
+            --private-platform=AWS \
+            --aws-private-creds="${AWS_CREDS}" \
+            --aws-private-region="${REGION}"
+
+   **Option B: Existing HyperShift installation**
+
+        $ kubectl scale deployment operator -n hypershift --replicas=0
+
+3. Run the HyperShift operator locally with required environment variables and flags:
+
+        $ export MY_NAMESPACE=hypershift
+        $ export MY_NAME=operator-local
+        $ ./bin/hypershift-operator run \
+            --control-plane-operator-image=quay.io/hypershift/hypershift:latest \
+            --namespace=hypershift \
+            --pod-name=operator-local \
+            --metrics-addr=0 \
+            --enable-ocp-cluster-monitoring=false
+
+   **Required flags explained:**
+   - `--control-plane-operator-image`: Specifies the image to use for control-plane-operator pods
+   - `MY_NAMESPACE`/`MY_NAME`: Environment variables used for operator metrics (required but can be any values)
+   - `--metrics-addr=0`: Disables metrics server (useful for local development)
+   - `--enable-ocp-cluster-monitoring=false`: Disables OCP cluster monitoring integration
+
+   **Platform-specific configuration (AWS example):**
+
+   If you need to create hosted clusters (not just run the operator), add platform credentials:
+
+        $ export HYPERSHIFT_AWS_CREDS="${HOME}/.aws/credentials"
+        $ export HYPERSHIFT_REGION="us-east-1"
+        $ export HYPERSHIFT_BUCKET_NAME="your-oidc-bucket"
+        $ ./bin/hypershift-operator run \
+            --control-plane-operator-image=quay.io/hypershift/hypershift:latest \
+            --namespace=hypershift \
+            --pod-name=operator-local \
+            --metrics-addr=0 \
+            --enable-ocp-cluster-monitoring=false \
+            --private-platform=AWS \
+            --oidc-storage-provider-s3-credentials="${HYPERSHIFT_AWS_CREDS}" \
+            --oidc-storage-provider-s3-region="${HYPERSHIFT_REGION}" \
+            --oidc-storage-provider-s3-bucket-name="${HYPERSHIFT_BUCKET_NAME}"
+
+4. Verify the operator is running:
+
+   You should see log messages indicating:
+   - "starting manager"
+   - "successfully acquired lease hypershift/hypershift-operator-leader-elect"
+   - Controllers starting (hostedcluster, nodepool, etc.)
+
+   Note: The warning "pod not found, reporting empty image" is expected when running locally.
+
+#### Using Make Targets (Recommended)
+
+For easier local development, use the provided make targets:
+
+**Prerequisites:**
+
+1. **Connect Telepresence** (required for DNS resolution):
+
+        $ telepresence connect
+
+2. **Set required environment variables:**
+
+   **Option A: Using .envrc file (Recommended)**
+   ```bash
+   cp hack/dev/common/envrc.sample .envrc
+   vim .envrc  # Edit with your values
+   source .envrc
+   ```
+
+   **Option B: Export manually**
+   ```bash
+   export KUBECONFIG=/path/to/your/management/cluster/kubeconfig
+   export BUCKET_NAME=your-oidc-bucket-name
+   export AWS_CREDS=/path/to/.aws/credentials
+   export REGION=us-east-1
+   ```
+
+   **Tip:** If you use [direnv](https://direnv.net/), the `.envrc` file will auto-load when entering the directory.
+
+**Workflow:**
+
+1. **Full test workflow** (starts operator, validates, then stops):
+
+        $ make test-local-operator
+
+2. **Start and keep operator running** (for active development):
+
+        $ make start-operator-locally     # Starts operator in background
+        $ make validate-local-operator    # Validates it's working
+        # Make code changes...
+        $ make stop-operator-locally && make start-operator-locally  # Restart
+
+3. **Monitor operator logs**:
+
+        $ tail -f /tmp/hypershift-operator-local-*.log
+
+4. **Stop the operator**:
+
+        $ make stop-operator-locally
+
+**Make targets available:**
+- `make install-hypershift-development` - Install HyperShift in development mode with OIDC config
+- `make uninstall-hypershift-development` - Uninstall HyperShift development installation
+- `make start-operator-locally` - Starts operator in background, logs to `/tmp/`
+- `make stop-operator-locally` - Stops the local operator
+- `make validate-local-operator` - Validates operator is working (starts if needed)
+- `make test-local-operator` - Full cycle: start → validate → stop
+- `make create-test-cluster-local` - Creates a test HostedCluster for validation
+- `make destroy-test-cluster-local` - Destroys the test cluster
+- `make test-local-operator-with-cluster-creation` - Full test including cluster creation
+
+#### Testing Cluster Creation with Local Operator
+
+To verify your local operator can create and reconcile hosted clusters:
+
+1. **Set required environment variables** (or source your .envrc):
+
+        $ export CLUSTER_NAME=my-cluster
+        $ export BASE_DOMAIN=example.hypershift.devcluster.openshift.com
+        $ export PULL_SECRET=/path/to/pull-secret
+        $ export REGION=us-east-1
+        $ export AWS_CREDS=/path/to/.aws/credentials
+        $ export NAMESPACE=clusters
+        $ export REPLICAS=1  # Optional, defaults to 1 for test clusters
+        $ export RELEASE_IMAGE=quay.io/openshift-release-dev/ocp-release:4.19.18-x86_64  # Optional, defaults to 4.19.18
+
+2. **Create a test cluster**:
+
+        $ make create-test-cluster-local
+
+   This will:
+   - Generate manifests to a random tmp directory (e.g., `/tmp/hypershift-test-cluster-abc123/`)
+   - Create a timestamped cluster name (e.g., `my-cluster-test-local-1731024567`)
+   - Apply manifests to the management cluster
+   - Store cluster info in `.test-cluster.info` for cleanup
+   - Print manifest location for inspection
+
+3. **Validate operator is reconciling**:
+
+        $ make validate-local-operator
+
+4. **Destroy the test cluster** (to avoid AWS costs):
+
+        $ make destroy-test-cluster-local
+
+   This will run `hypershift destroy` with the saved infraID and preserve manifests for inspection.
+
+5. **Or run the complete test** (create → validate → destroy):
+
+        $ make test-local-operator-with-cluster-creation
+
+**Optional: Test with custom control-plane-operator image:**
+
+        $ export CONTROL_PLANE_OPERATOR_IMAGE=quay.io/myrepo/control-plane-operator:latest
+        $ make create-test-cluster-local
 
 ### Building Custom Images
 To build images that can be both used for HyperShift installation and Hosted Cluster creation

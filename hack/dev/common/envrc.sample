@@ -1,0 +1,34 @@
+# HyperShift Local Development Environment
+# Copy this file to .envrc and customize for your setup
+#
+# To use with direnv (https://direnv.net/):
+#   1. Install direnv (optional but convenient)
+#   2. Run: direnv allow
+#
+# To use manually:
+#   source .envrc
+
+# Management cluster kubeconfig
+export KUBECONFIG=/path/to/your/management/cluster/kubeconfig
+
+# AWS credentials and region
+export AWS_CREDS="${HOME}/.aws/credentials"
+export REGION=us-east-1
+
+# S3 bucket for OIDC storage
+export BUCKET_NAME=your-oidc-bucket-name
+
+# Test cluster configuration (optional - for cluster creation testing)
+export CLUSTER_NAME=test-dev
+export BASE_DOMAIN=example.hypershift.devcluster.openshift.com
+export PULL_SECRET="${HOME}/.pull-secret.json"
+export NAMESPACE=clusters
+
+# Optional: Override default replicas for test clusters
+# export REPLICAS=1
+
+# Optional: Override release image
+# export RELEASE_IMAGE=quay.io/openshift-release-dev/ocp-release:4.19.18-x86_64
+
+# Optional: Custom control plane operator image
+# export CONTROL_PLANE_OPERATOR_IMAGE=quay.io/hypershift/hypershift:latest
