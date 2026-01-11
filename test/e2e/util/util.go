@@ -80,7 +80,8 @@ import (
 )
 
 var (
-	expectedKasManagementComponents = []string{
+	// commonKasManagementComponents contains components that need management KAS access on all platforms.
+	commonKasManagementComponents = []string{
 		"cluster-network-operator",
 		"ignition-server",
 		"cluster-storage-operator",
@@ -97,10 +98,20 @@ var (
 		"hosted-cluster-config-operator",
 		"cloud-controller-manager",
 		"olm-collect-profiles",
+		"featuregate-generator",
+	}
+
+	// awsKasManagementComponents contains AWS-specific components that need management KAS access.
+	awsKasManagementComponents = []string{
 		"aws-ebs-csi-driver-operator",
 		"karpenter",
 		"karpenter-operator",
-		"featuregate-generator",
+	}
+
+	// azureKasManagementComponents contains Azure-specific components that need management KAS access.
+	azureKasManagementComponents = []string{
+		"azure-disk-csi-driver-operator",
+		"azure-file-csi-driver-operator",
 	}
 
 	// podCrashTolerations defines the tolerated amount of restarts a pod is allowed to suffer until it is considered to be crashing.
@@ -126,6 +137,19 @@ var (
 		"aws-ebs-csi-driver-controller": 1,
 	}
 )
+
+// getExpectedKasManagementComponents returns the list of components that should have
+// the NeedManagementKASAccessLabel for a given platform.
+func getExpectedKasManagementComponents(platform hyperv1.PlatformType) []string {
+	components := append([]string{}, commonKasManagementComponents...)
+	switch platform {
+	case hyperv1.AWSPlatform:
+		components = append(components, awsKasManagementComponents...)
+	case hyperv1.AzurePlatform:
+		components = append(components, azureKasManagementComponents...)
+	}
+	return components
+}
 
 type GuestClients struct {
 	CfgClient  *configv1client.Clientset
@@ -1127,14 +1151,16 @@ func EnsureAllRoutesUseHCPRouter(t *testing.T, ctx context.Context, hostClient c
 
 func EnsureNetworkPolicies(t *testing.T, ctx context.Context, c crclient.Client, hostedCluster *hyperv1.HostedCluster) {
 	t.Run("EnsureNetworkPolicies", func(t *testing.T) {
-		if hostedCluster.Spec.Platform.Type != hyperv1.AWSPlatform {
-			t.Skipf("test only supported on AWS platform, saw %s", hostedCluster.Spec.Platform.Type)
+		if hostedCluster.Spec.Platform.Type != hyperv1.AWSPlatform &&
+			hostedCluster.Spec.Platform.Type != hyperv1.AzurePlatform {
+			t.Skipf("test only supported on AWS and Azure platforms, saw %s", hostedCluster.Spec.Platform.Type)
 		}
 
 		hcpNamespace := manifests.HostedControlPlaneNamespace(hostedCluster.Namespace, hostedCluster.Name)
 		t.Run("EnsureComponentsHaveNeedManagementKASAccessLabel", func(t *testing.T) {
 			g := NewWithT(t)
-			err := checkPodsHaveLabel(ctx, c, expectedKasManagementComponents, hcpNamespace, crclient.MatchingLabels{suppconfig.NeedManagementKASAccessLabel: "true"})
+			expectedComponents := getExpectedKasManagementComponents(hostedCluster.Spec.Platform.Type)
+			err := checkPodsHaveLabel(ctx, c, expectedComponents, hcpNamespace, crclient.MatchingLabels{suppconfig.NeedManagementKASAccessLabel: "true"})
 			g.Expect(err).ToNot(HaveOccurred())
 		})
 
@@ -1168,6 +1194,9 @@ func EnsureNetworkPolicies(t *testing.T, ctx context.Context, c crclient.Client,
 			g.Expect(err).To(HaveOccurred())
 
 			// Validate private router is not allowed to access management KAS.
+			// Note: private-router is only deployed on AWS (non-Private endpoint).
+			// Azure doesn't deploy private-router (private HCP not implemented for Azure self-managed,
+			// and ARO-HCP uses shared ingress).
 			if hostedCluster.Spec.Platform.Type == hyperv1.AWSPlatform {
 				if hostedCluster.Spec.Platform.AWS.EndpointAccess != hyperv1.Private {
 					// TODO (alberto): Run also in private case. Today it results in a flake:
@@ -1181,9 +1210,10 @@ func EnsureNetworkPolicies(t *testing.T, ctx context.Context, c crclient.Client,
 
 			// Validate cluster api is allowed to access management KAS.
 			stdOut, err := RunCommandInPod(ctx, c, "cluster-api", hcpNamespace, command, "manager", 0)
-			// Expect curl return a 403 from the KAS.
-			if !strings.Contains(stdOut, "HTTP/2 403") || err != nil {
-				t.Errorf("cluster api pod was unexpectedly not allowed to reach the management KAS. stdOut: %s. stdErr: %s", stdOut, err.Error())
+			// Expect curl to return an HTTP response from the KAS (401, 403, etc. all indicate network connectivity works).
+			// Different management clusters may return different status codes.
+			if !strings.Contains(stdOut, "HTTP/") || err != nil {
+				t.Errorf("cluster api pod was unexpectedly not allowed to reach the management KAS. stdOut: %s. stdErr: %v", stdOut, err)
 			}
 		})
 	})
@@ -3125,12 +3155,18 @@ func EnsureSATokenNotMountedUnlessNecessary(t *testing.T, ctx context.Context, c
 			t.Fatalf("failed to list pods in namespace %s: %v", hcpNamespace, err)
 		}
 
-		expectedComponentsWithTokenMount := append(expectedKasManagementComponents,
-			"aws-ebs-csi-driver-controller",
+		expectedComponentsWithTokenMount := append(getExpectedKasManagementComponents(hostedCluster.Spec.Platform.Type),
 			"packageserver",
 			"csi-snapshot-controller",
 			"shared-resource-csi-driver-operator",
 		)
+
+		// Add platform-specific CSI driver controllers
+		if hostedCluster.Spec.Platform.Type == hyperv1.AWSPlatform {
+			expectedComponentsWithTokenMount = append(expectedComponentsWithTokenMount,
+				"aws-ebs-csi-driver-controller",
+			)
+		}
 
 		if IsLessThan(Version418) {
 			expectedComponentsWithTokenMount = append(expectedComponentsWithTokenMount,
