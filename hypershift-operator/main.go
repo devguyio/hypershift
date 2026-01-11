@@ -123,6 +123,7 @@ type StartOptions struct {
 	EnableUWMTelemetryRemoteWrite          bool
 	EnableValidatingWebhook                bool
 	EnableDedicatedRequestServingIsolation bool
+	ManagementClusterPodCIDR               string
 }
 
 func NewStartCommand() *cobra.Command {
@@ -159,6 +160,7 @@ func NewStartCommand() *cobra.Command {
 	cmd.Flags().BoolVar(&opts.EnableUWMTelemetryRemoteWrite, "enable-uwm-telemetry-remote-write", opts.EnableUWMTelemetryRemoteWrite, "If true, enables a controller that ensures user workload monitoring is enabled and that it is configured to remote write telemetry metrics from control planes")
 	cmd.Flags().BoolVar(&opts.EnableValidatingWebhook, "enable-validating-webhook", false, "Enable webhook for validating hypershift API types")
 	cmd.Flags().BoolVar(&opts.EnableDedicatedRequestServingIsolation, "enable-dedicated-request-serving-isolation", true, "If true, enables scheduling of request serving components to dedicated nodes")
+	cmd.Flags().StringVar(&opts.ManagementClusterPodCIDR, "management-cluster-pod-cidr", "", "Optional pod CIDR of the management cluster. If set, network policies will block egress to this CIDR in addition to KAS IPs. Use this on non-OpenShift management clusters (e.g., AKS) where configv1.Network is unavailable.")
 
 	// Attempt to determine featureset prior to adding featuregate flags.
 	// It is safe to get the empty string from this as the empty string is the default featureset.
@@ -339,6 +341,7 @@ func run(ctx context.Context, opts *StartOptions, log logr.Logger) error {
 		EnableEtcdRecovery:                      enableEtcdRecovery,
 		FeatureSet:                              featuregate.FeatureSet(),
 		OpenShiftTrustedCAFilePath:              "/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem",
+		ManagementClusterPodCIDR:                opts.ManagementClusterPodCIDR,
 	}
 	if opts.OIDCStorageProviderS3BucketName != "" {
 		awsSession := awsutil.NewSession("hypershift-operator-oidc-bucket", opts.OIDCStorageProviderS3Credentials, "", "", opts.OIDCStorageProviderS3Region)

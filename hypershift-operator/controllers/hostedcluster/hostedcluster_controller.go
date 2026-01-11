@@ -201,6 +201,11 @@ type HostedClusterReconciler struct {
 	FeatureSet configv1.FeatureSet
 
 	OpenShiftTrustedCAFilePath string
+
+	// ManagementClusterPodCIDR is an optional pod CIDR for the management cluster.
+	// If set, network policies will block egress to this CIDR in addition to KAS IPs.
+	// This is used on non-OpenShift management clusters (e.g., AKS) where configv1.Network is unavailable.
+	ManagementClusterPodCIDR string
 }
 
 // +kubebuilder:rbac:groups=hypershift.openshift.io,resources=hostedclusters,verbs=get;list;watch;create;update;patch;delete
