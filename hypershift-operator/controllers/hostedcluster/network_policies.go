@@ -74,10 +74,11 @@ func (r *HostedClusterReconciler) reconcileNetworkPolicies(ctx context.Context, 
 	}
 
 	// ManagementKASNetworkPolicy restricts traffic for pods unless they have a known annotation.
-	if controlPlaneOperatorAppliesManagementKASNetworkPolicyLabel && hcluster.Spec.Platform.Type == hyperv1.AWSPlatform {
+	if controlPlaneOperatorAppliesManagementKASNetworkPolicyLabel &&
+		(hcluster.Spec.Platform.Type == hyperv1.AWSPlatform || hcluster.Spec.Platform.Type == hyperv1.AzurePlatform) {
 		policy = networkpolicy.ManagementKASNetworkPolicy(controlPlaneNamespaceName)
 		if _, err := createOrUpdate(ctx, r.Client, policy, func() error {
-			return reconcileManagementKASNetworkPolicy(policy, managementClusterNetwork, kubernetesEndpoint, r.ManagementClusterCapabilities.Has(capabilities.CapabilityDNS))
+			return reconcileManagementKASNetworkPolicy(policy, managementClusterNetwork, kubernetesEndpoint, r.ManagementClusterCapabilities.Has(capabilities.CapabilityDNS), hcluster.Spec.Platform.Type, r.ManagementClusterPodCIDR)
 		}); err != nil {
 			return fmt.Errorf("failed to reconcile kube-apiserver network policy: %w", err)
 		}
@@ -119,7 +120,7 @@ func (r *HostedClusterReconciler) reconcileNetworkPolicies(ctx context.Context, 
 		// only setup ingress rules (and not egress rules) when version is < 4.14
 		ingressOnly := version.Major == 4 && version.Minor < 14
 		if _, err := createOrUpdate(ctx, r.Client, policy, func() error {
-			return reconcilePrivateRouterNetworkPolicy(policy, hcluster, kubernetesEndpoint, r.ManagementClusterCapabilities.Has(capabilities.CapabilityDNS), managementClusterNetwork, ingressOnly)
+			return reconcilePrivateRouterNetworkPolicy(policy, hcluster, kubernetesEndpoint, r.ManagementClusterCapabilities.Has(capabilities.CapabilityDNS), managementClusterNetwork, ingressOnly, r.ManagementClusterPodCIDR)
 		}); err != nil {
 			return fmt.Errorf("failed to reconcile private router network policy: %w", err)
 		}
@@ -232,7 +233,7 @@ func reconcileKASNetworkPolicy(policy *networkingv1.NetworkPolicy, hcluster *hyp
 	return nil
 }
 
-func reconcilePrivateRouterNetworkPolicy(policy *networkingv1.NetworkPolicy, hcluster *hyperv1.HostedCluster, kubernetesEndpoint *corev1.Endpoints, isOpenShiftDNS bool, managementClusterNetwork *configv1.Network, ingressOnly bool) error {
+func reconcilePrivateRouterNetworkPolicy(policy *networkingv1.NetworkPolicy, hcluster *hyperv1.HostedCluster, kubernetesEndpoint *corev1.Endpoints, isOpenShiftDNS bool, managementClusterNetwork *configv1.Network, ingressOnly bool, managementClusterPodCIDR string) error {
 	httpPort := intstr.FromInt(8080)
 	httpsPort := intstr.FromInt(8443)
 	protocol := corev1.ProtocolTCP
@@ -262,11 +263,14 @@ func reconcilePrivateRouterNetworkPolicy(policy *networkingv1.NetworkPolicy, hcl
 	}
 
 	clusterNetworks := make([]string, 0)
-	// In vanilla kube management cluster this would be nil.
+	// In vanilla kube management cluster (e.g., AKS), configv1.Network is nil.
+	// Use explicit managementClusterPodCIDR if provided.
 	if managementClusterNetwork != nil {
 		for _, network := range managementClusterNetwork.Spec.ClusterNetwork {
 			clusterNetworks = append(clusterNetworks, network.CIDR)
 		}
+	} else if managementClusterPodCIDR != "" {
+		clusterNetworks = append(clusterNetworks, managementClusterPodCIDR)
 	}
 
 	// Allow to any destination not on the management cluster service network
@@ -702,7 +706,7 @@ func reconcileSameNamespaceNetworkPolicy(policy *networkingv1.NetworkPolicy) err
 
 // reconcileManagementKASNetworkPolicy selects pods excluding the ones having NeedManagementKASAccessLabel and specific operands.
 // It denies egress traffic to the management cluster clusterNetwork and to the KAS endpoints.
-func reconcileManagementKASNetworkPolicy(policy *networkingv1.NetworkPolicy, managementClusterNetwork *configv1.Network, kubernetesEndpoint *corev1.Endpoints, isOpenShiftDNS bool) error {
+func reconcileManagementKASNetworkPolicy(policy *networkingv1.NetworkPolicy, managementClusterNetwork *configv1.Network, kubernetesEndpoint *corev1.Endpoints, isOpenShiftDNS bool, platformType hyperv1.PlatformType, managementClusterPodCIDR string) error {
 	// Allow traffic to same namespace
 	policy.Spec.Egress = []networkingv1.NetworkPolicyEgressRule{
 		{
@@ -715,11 +719,14 @@ func reconcileManagementKASNetworkPolicy(policy *networkingv1.NetworkPolicy, man
 	}
 
 	clusterNetworks := make([]string, 0)
-	// In vanilla kube management cluster this would be nil.
+	// In vanilla kube management cluster (e.g., AKS), configv1.Network is nil.
+	// Use explicit managementClusterPodCIDR if provided.
 	if managementClusterNetwork != nil {
 		for _, network := range managementClusterNetwork.Spec.ClusterNetwork {
 			clusterNetworks = append(clusterNetworks, network.CIDR)
 		}
+	} else if managementClusterPodCIDR != "" {
+		clusterNetworks = append(clusterNetworks, managementClusterPodCIDR)
 	}
 
 	// Allow to any destination not on the management cluster service network
@@ -786,6 +793,16 @@ func reconcileManagementKASNetworkPolicy(policy *networkingv1.NetworkPolicy, man
 		})
 	}
 
+	// Build exclusion list based on platform.
+	// CSI driver operators need management KAS access for their operands.
+	var excludedOperators []string
+	switch platformType {
+	case hyperv1.AWSPlatform:
+		excludedOperators = []string{"aws-ebs-csi-driver-operator"}
+	case hyperv1.AzurePlatform:
+		excludedOperators = []string{"azure-disk-csi-driver-operator", "azure-file-csi-driver-operator"}
+	}
+
 	policy.Spec.PolicyTypes = []networkingv1.PolicyType{networkingv1.PolicyTypeEgress}
 	policy.Spec.PodSelector = metav1.LabelSelector{
 		MatchExpressions: []metav1.LabelSelectorRequirement{
@@ -797,7 +814,7 @@ func reconcileManagementKASNetworkPolicy(policy *networkingv1.NetworkPolicy, man
 			{
 				Key:      "name",
 				Operator: "NotIn",
-				Values:   []string{"aws-ebs-csi-driver-operator"},
+				Values:   excludedOperators,
 			},
 		},
 	}
