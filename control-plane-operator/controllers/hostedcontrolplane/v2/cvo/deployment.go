@@ -323,18 +323,13 @@ func discoverCVOReleaseImages(cpContext component.WorkloadContext) (string, stri
 	}
 	pullSecretBytes := pullSecret.Data[corev1.DockerConfigJsonKey]
 
-	cpReleaseImage := cpContext.HCP.Spec.ReleaseImage
-	if cpContext.HCP.Spec.ControlPlaneReleaseImage != nil {
-		cpReleaseImage = *cpContext.HCP.Spec.ControlPlaneReleaseImage
-	}
-
-	_, controlPlaneReleaseImageRef, err := cpContext.ImageMetadataProvider.GetDigest(cpContext.Context, cpReleaseImage, pullSecretBytes)
+	_, controlPlaneReleaseImageRef, err := cpContext.ImageMetadataProvider.GetDigest(cpContext.Context, util.HCPControlPlaneReleaseImage(cpContext.HCP), pullSecretBytes)
 	if err != nil {
-		return "", "", fmt.Errorf("failed to get control plane release image digest %s: %w", controlPlaneReleaseImageRef, err)
+		return "", "", fmt.Errorf("failed to resolve control plane release image digest: %w", err)
 	}
 	controlPlaneReleaseImage = controlPlaneReleaseImageRef.String()
 
-	if cpReleaseImage != cpContext.HCP.Spec.ReleaseImage {
+	if util.HCPControlPlaneReleaseImage(cpContext.HCP) != cpContext.HCP.Spec.ReleaseImage {
 		_, dataPlaneReleaseImageRef, err := cpContext.ImageMetadataProvider.GetDigest(cpContext.Context, cpContext.HCP.Spec.ReleaseImage, pullSecret.Data[corev1.DockerConfigJsonKey])
 		if err != nil {
 			return "", "", fmt.Errorf("failed to get data plane release image digest %s: %w", cpContext.HCP.Spec.ReleaseImage, err)
