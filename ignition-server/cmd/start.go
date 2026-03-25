@@ -22,6 +22,7 @@ import (
 	"github.com/openshift/hypershift/support/util"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/client-go/util/retry"
 
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
@@ -273,13 +274,17 @@ func run(ctx context.Context, opts Options) error {
 		getRequestsPerNodePool.WithLabelValues(r.Header.Get("NodePool")).Inc()
 
 		// Annotate tokenSecret so NodePool controller can set a conditions based on it.
-		if err := mgr.GetClient().Get(ctx, client.ObjectKeyFromObject(tokenSecret), tokenSecret); err != nil {
-			log.Printf("Failed to get tokenSecret resource: %q: %s", client.ObjectKeyFromObject(tokenSecret).String(), err)
-		} else {
-			tokenSecret.Annotations[TokenSecretIgnitionReachedAnnotation] = "True"
-			if err := mgr.GetClient().Update(ctx, tokenSecret); err != nil {
-				log.Printf("Failed to update tokenSecret: %q: %s", tokenSecret.Name, err)
+		// Use retry-on-conflict because the TokenSecretReconciler (running in the same
+		// process) may concurrently patch the token secret with payload data, bumping
+		// the resourceVersion and causing a conflict on our Update.
+		if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			if err := mgr.GetClient().Get(ctx, client.ObjectKeyFromObject(tokenSecret), tokenSecret); err != nil {
+				return err
 			}
+			tokenSecret.Annotations[TokenSecretIgnitionReachedAnnotation] = "True"
+			return mgr.GetClient().Update(ctx, tokenSecret)
+		}); err != nil {
+			log.Printf("Failed to annotate tokenSecret %q with ignition-reached: %s", tokenSecret.Name, err)
 		}
 	})
 	mux.HandleFunc("/healthz", func(http.ResponseWriter, *http.Request) {})
