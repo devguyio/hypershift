@@ -22,7 +22,7 @@ For a comprehensive reference on what triggers a rollout, upgrade strategies, ro
 
 ### Upgrading to a new OCP version
 
-These upgrades can be triggered via changing the `spec.release.image` of the NodePool. Note that you should only upgrade NodePools to the current version of the Hosted Control Plane.
+These upgrades can be triggered via changing the `spec.release.image` of the NodePool. Note that you should only upgrade NodePools to the current version of the Hosted Control Plane. You can check the control plane rollout status via `status.controlPlaneVersion` on the HostedCluster to determine which versions are currently active. See [Control Plane Version Status](../../how-to/upgrades.md#control-plane-version-status) for details.
 
 ### Adding a new MachineConfig
 

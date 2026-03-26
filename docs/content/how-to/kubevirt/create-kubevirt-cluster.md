@@ -126,8 +126,8 @@ reflects what a fully provisioned HostedCluster object looks like.
 
 oc get --namespace clusters hostedclusters
 
-NAME            VERSION   KUBECONFIG                       PROGRESS   AVAILABLE   PROGRESSING   MESSAGE
-example         4.14.0    example-admin-kubeconfig         Completed  True        False         The hosted control plane is available
+NAME            VERSION   CP VERSION   KUBECONFIG                       PROGRESS   AVAILABLE   PROGRESSING   MESSAGE
+example         4.14.0    4.14.0       example-admin-kubeconfig         Completed  True        False         The hosted control plane is available
 ```
 
 ## Accessing the HostedCluster

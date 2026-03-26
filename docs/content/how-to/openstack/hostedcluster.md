@@ -176,8 +176,8 @@ To know whether the HostedCluster is healthy, you can verify with this command:
 ```shell
 oc get --namespace clusters hostedclusters
 
-NAME            VERSION   KUBECONFIG                       PROGRESS   AVAILABLE   PROGRESSING   MESSAGE
-example         4.17.0    example-admin-kubeconfig         Completed  True        False         The hosted control plane is available
+NAME            VERSION   CP VERSION   KUBECONFIG                       PROGRESS   AVAILABLE   PROGRESSING   MESSAGE
+example         4.17.0    4.17.0       example-admin-kubeconfig         Completed  True        False         The hosted control plane is available
 ```
 
 ## Scaling an existing NodePool

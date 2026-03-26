@@ -405,8 +405,8 @@ version             False       True          3h46m   Unable to apply 4.9.17: so
 
 ~~~sh
 oc get hostedcluster -n clusters hosted0
-NAME      VERSION   KUBECONFIG                 PROGRESS    AVAILABLE   REASON
-hosted0   4.9.17    hosted0-admin-kubeconfig   Completed   True        HostedClusterAsExpected
+NAME      VERSION   CP VERSION   KUBECONFIG                 PROGRESS    AVAILABLE   PROGRESSING   MESSAGE
+hosted0   4.9.17    4.9.17       hosted0-admin-kubeconfig   Completed   True        False         HostedClusterAsExpected
 
 KUBECONFIG=./hosted0-kubeconfig oc get co
 NAME                                       VERSION   AVAILABLE   PROGRESSING   DEGRADED   SINCE   MESSAGE

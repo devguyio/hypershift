@@ -205,8 +205,8 @@ namespace and when ready it will look similar to the following:
 
 ```
 oc get --namespace clusters hostedclusters
-NAME      VERSION   KUBECONFIG                 PROGRESS    AVAILABLE   PROGRESSING   MESSAGE
-example   4.12.0    example-admin-kubeconfig   Completed   True        False         The hosted control plane is available
+NAME      VERSION   CP VERSION   KUBECONFIG                 PROGRESS    AVAILABLE   PROGRESSING   MESSAGE
+example   4.12.0    4.12.0       example-admin-kubeconfig   Completed   True        False         The hosted control plane is available
 
 oc get nodepools --namespace clusters
 NAME                 CLUSTER   DESIRED NODES   CURRENT NODES   AUTOSCALING   AUTOREPAIR   VERSION   UPDATINGVERSION   UPDATINGCONFIG   MESSAGE

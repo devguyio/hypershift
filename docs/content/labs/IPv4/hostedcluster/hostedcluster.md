@@ -243,8 +243,8 @@ packageserver-67c87d4d4f-kl7qh                        2/2     Running   0       
 And this is how the HostedCluster looks like:
 
 ```bash
-NAMESPACE   NAME         VERSION   KUBECONFIG                PROGRESS   AVAILABLE   PROGRESSING   MESSAGE
-clusters    hosted-ipv4            hosted-admin-kubeconfig   Partial    True 	      False         The hosted control plane is available
+NAMESPACE   NAME         VERSION   CP VERSION   KUBECONFIG                PROGRESS   AVAILABLE   PROGRESSING   MESSAGE
+clusters    hosted-ipv4                        hosted-admin-kubeconfig   Partial    True 	      False         The hosted control plane is available
 ```
 
 After some time, we will have almost all the pieces in place, and the Control Plane operator awaits for the worker nodes to join the cluster. To achieve this, we need to create some more objects. Let's discuss the `InfraEnv` and the `BareMetalHost` in the following sections.

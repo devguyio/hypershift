@@ -141,6 +141,8 @@ against your KUBECONFIG. Running the `hcp version --commit-only` will show the c
 
 HyperShift validates version compatibility between HostedClusters and their NodePools. While the system reports version incompatibilities, existing NodePools with unsupported version skews will continue to operate without guarantees of stability or support.
 
+The `status.controlPlaneVersion` field on both `HostedCluster` and `HostedControlPlane` tracks the rollout state of management-side control plane components independently from the data-plane version reported by CVO. This can be used to verify the control plane has completed its upgrade before initiating NodePool upgrades or to compute version skew between the control plane and NodePools. See [Upgrades](../how-to/upgrades.md#control-plane-version-status) for details.
+
 ### Version Skew Policy
 
 The following rules apply to NodePool version compatibility:

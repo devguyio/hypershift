@@ -71,8 +71,8 @@ This time, the HostedCluster will not finish the deployment (will remain in `Par
 ```shell linenums="1"
 oc get --namespace clusters hostedclusters
 
-NAME            VERSION   KUBECONFIG                       PROGRESS   AVAILABLE   PROGRESSING   MESSAGE
-example                   example-admin-kubeconfig         Partial    True        False         The hosted control plane is available
+NAME            VERSION   CP VERSION   KUBECONFIG                       PROGRESS   AVAILABLE   PROGRESSING   MESSAGE
+example                                example-admin-kubeconfig         Partial    True        False         The hosted control plane is available
 ```
 
 If we access the HostedCluster this is what we will see:
@@ -168,8 +168,8 @@ Now that we fixed the ingress, we should see our HostedCluster progress moved fr
 ```shell linenums="1"
 oc get --namespace clusters hostedclusters
 
-NAME            VERSION   KUBECONFIG                       PROGRESS    AVAILABLE   PROGRESSING   MESSAGE
-example         4.14.0    example-admin-kubeconfig         Completed   True        False         The hosted control plane is available
+NAME            VERSION   CP VERSION   KUBECONFIG                       PROGRESS    AVAILABLE   PROGRESSING   MESSAGE
+example         4.14.0    4.14.0       example-admin-kubeconfig         Completed   True        False         The hosted control plane is available
 ```
 
 ## Optional MetalLB Configuration Steps

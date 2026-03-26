@@ -153,7 +153,9 @@ When a rollout is triggered, the controller follows this sequence:
 
 ### Monitoring Rollout Progress
 
-You can monitor rollout progress through the following NodePool conditions:
+NodePool rollouts track *data-plane* node updates. For *control-plane* rollout status, see [`status.controlPlaneVersion`](../how-to/upgrades.md#control-plane-version-status) on the HostedCluster, which can be used to determine which NodePool versions are allowed under the version skew policy.
+
+You can monitor NodePool rollout progress through the following conditions:
 
 | Condition | Meaning |
 |-----------|---------|
