@@ -1,0 +1,23 @@
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingWebhookConfiguration
+metadata:
+  name: hc-node-selector-webhook
+  annotations:
+    service.beta.openshift.io/inject-cabundle: "true"
+webhooks:
+  - name: hc-node-selector-webhook.hypershift.svc
+    admissionReviewVersions: ["v1"]
+    sideEffects: None
+    failurePolicy: Ignore
+    timeoutSeconds: 5
+    reinvocationPolicy: Never
+    clientConfig:
+      service:
+        name: hc-node-selector-webhook
+        namespace: hypershift
+        path: "/mutate-hostedcluster"
+    rules:
+      - operations: ["CREATE"]
+        apiGroups: ["hypershift.openshift.io"]
+        apiVersions: ["v1beta1"]
+        resources: ["hostedclusters"]

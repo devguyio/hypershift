@@ -1,0 +1,10 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: hc-node-selector-webhook
+  namespace: hypershift
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: hc-node-selector-webhook
