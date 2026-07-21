@@ -136,6 +136,7 @@ lint-fix: generate
 
 .PHONY: verify-git-clean
 verify-git-clean:
+	git update-index --refresh
 	git diff-index --cached --quiet --ignore-submodules HEAD --
 	git diff-files --quiet --ignore-submodules
 	git diff --exit-code HEAD --
@@ -159,6 +160,30 @@ verify-crd-schema: $(CRD_SCHEMA_CHECK) ## Verify CRD schemas for breaking change
 
 .PHONY: verify-parallel
 verify-parallel: verify-codespell verify-codecov verify-api-deps verify-crd-schema lint cpo-container-sync run-gitlint verify-docs-nav
+
+ifdef GITHUB_ACTIONS
+define run-verify-step
+	@echo "::group::Verify: $(1)"
+	@$(MAKE) $(1) || (echo "::endgroup::" && echo "::error::Verify step '$(1)' failed" && false)
+	@echo "::endgroup::"
+endef
+else
+define run-verify-step
+	$(MAKE) $(1)
+endef
+endif
+
+.PHONY: verify-ci
+verify-ci: ## Run the same checks as the GHA verify workflow.
+	$(call run-verify-step,generate)
+	$(call run-verify-step,update)
+	$(call run-verify-step,staticcheck)
+	$(call run-verify-step,fmt)
+	$(call run-verify-step,vet)
+	$(call run-verify-step,verify-api-deps)
+	$(call run-verify-step,verify-crd-schema)
+	$(call run-verify-step,verify-docs-nav)
+	$(call run-verify-step,verify-git-clean)
 
 .PHONY: verify
 verify: generate update staticcheck fmt vet
