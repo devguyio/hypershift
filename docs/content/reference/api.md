@@ -1543,6 +1543,51 @@ If the platform does not support LoadBalancerSourceRanges, this field may have n
 </tr>
 </tbody>
 </table>
+###AWSCSIDriverConfig { #hypershift.openshift.io/v1beta1.AWSCSIDriverConfig }
+<p>
+(<em>Appears on:</em>
+<a href="#hypershift.openshift.io/v1beta1.CSIDriverOperatorConfig">CSIDriverOperatorConfig</a>)
+</p>
+<p>
+<p>AWSCSIDriverConfig specifies configuration for the AWS EBS CSI driver.</p>
+</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>kmsKeyARN</code></br>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>kmsKeyARN is the ARN of an AWS KMS key used to encrypt the default
+StorageClass volumes in the guest cluster. When set, the HCCO configures
+ClusterCSIDriver.spec.driverConfig.aws.kmsKeyARN on the guest cluster&rsquo;s
+ebs.csi.aws.com ClusterCSIDriver resource, which causes the CSI driver
+operator to set the kmsKeyId parameter on the default StorageClass.</p>
+<p>When omitted, no KMS encryption is configured on the default StorageClass.
+EBS volumes use the AWS account&rsquo;s default encryption settings.</p>
+<p>The value may be either the ARN or Alias ARN of a KMS key in the format:
+arn:<partition>:kms:<region>:<account-id>:(key|alias)/<resource-id></p>
+<p>When set, must be between 1 and 2048 characters.</p>
+<p>This field is applied at cluster creation time only. Day-2 changes to
+storage encryption should be made directly on the ClusterCSIDriver
+resource in the guest cluster.</p>
+<p>The StorageARN role in AWSRolesRef must have kms:Decrypt,
+kms:GenerateDataKeyWithoutPlaintext, and kms:CreateGrant
+permissions on the specified key.</p>
+</td>
+</tr>
+</tbody>
+</table>
 ###AWSCloudProviderConfig { #hypershift.openshift.io/v1beta1.AWSCloudProviderConfig }
 <p>
 (<em>Appears on:</em>
@@ -5089,6 +5134,41 @@ used in workload identity authentication for Azure Private Link Service operatio
 </p>
 <p>
 </p>
+###CSIDriverOperatorConfig { #hypershift.openshift.io/v1beta1.CSIDriverOperatorConfig }
+<p>
+(<em>Appears on:</em>
+<a href="#hypershift.openshift.io/v1beta1.OperatorConfiguration">OperatorConfiguration</a>)
+</p>
+<p>
+<p>CSIDriverOperatorConfig specifies configuration for CSI driver operators
+in the hosted cluster. Platform-specific configuration is nested inside
+the operator&rsquo;s config, following the ingress operator pattern where
+platform branching is inside the operator&rsquo;s own struct.</p>
+</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>aws,omitzero</code></br>
+<em>
+<a href="#hypershift.openshift.io/v1beta1.AWSCSIDriverConfig">
+AWSCSIDriverConfig
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>aws specifies configuration for the AWS EBS CSI driver operator.</p>
+</td>
+</tr>
+</tbody>
+</table>
 ###Capabilities { #hypershift.openshift.io/v1beta1.Capabilities }
 <p>
 (<em>Appears on:</em>
@@ -15346,6 +15426,22 @@ IngressOperatorSpec
 <em>(Optional)</em>
 <p>ingressOperator specifies the configuration for the Ingress Operator in the hosted cluster.
 This allows configuring how the default ingress controller endpoints are published.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>csiDriverConfig,omitzero</code></br>
+<em>
+<a href="#hypershift.openshift.io/v1beta1.CSIDriverOperatorConfig">
+CSIDriverOperatorConfig
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>csiDriverConfig specifies configuration for CSI driver operators in the hosted cluster.
+This allows configuring platform-specific CSI driver behavior such as KMS encryption
+for the default StorageClass.</p>
 </td>
 </tr>
 </tbody>

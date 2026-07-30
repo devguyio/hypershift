@@ -284,3 +284,47 @@ type IngressOperatorSpec struct {
 	// +kubebuilder:validation:Type=object
 	EndpointPublishingStrategy *operatorv1.EndpointPublishingStrategy `json:"endpointPublishingStrategy,omitempty"`
 }
+
+// CSIDriverOperatorConfig specifies configuration for CSI driver operators
+// in the hosted cluster. Platform-specific configuration is nested inside
+// the operator's config, following the ingress operator pattern where
+// platform branching is inside the operator's own struct.
+// +kubebuilder:validation:MinProperties=1
+type CSIDriverOperatorConfig struct {
+	// aws specifies configuration for the AWS EBS CSI driver operator.
+	// +optional
+	AWS AWSCSIDriverConfig `json:"aws,omitzero,omitempty"`
+}
+
+// AWSCSIDriverConfig specifies configuration for the AWS EBS CSI driver.
+// +kubebuilder:validation:MinProperties=1
+type AWSCSIDriverConfig struct {
+	// kmsKeyARN is the ARN of an AWS KMS key used to encrypt the default
+	// StorageClass volumes in the guest cluster. When set, the HCCO configures
+	// ClusterCSIDriver.spec.driverConfig.aws.kmsKeyARN on the guest cluster's
+	// ebs.csi.aws.com ClusterCSIDriver resource, which causes the CSI driver
+	// operator to set the kmsKeyId parameter on the default StorageClass.
+	//
+	// When omitted, no KMS encryption is configured on the default StorageClass.
+	// EBS volumes use the AWS account's default encryption settings.
+	//
+	// The value may be either the ARN or Alias ARN of a KMS key in the format:
+	//   arn:<partition>:kms:<region>:<account-id>:(key|alias)/<resource-id>
+	//
+	// When set, must be between 1 and 2048 characters.
+	//
+	// This field is applied at cluster creation time only. Day-2 changes to
+	// storage encryption should be made directly on the ClusterCSIDriver
+	// resource in the guest cluster.
+	//
+	// The StorageARN role in AWSRolesRef must have kms:Decrypt,
+	// kms:GenerateDataKeyWithoutPlaintext, and kms:CreateGrant
+	// permissions on the specified key.
+	//
+	// +optional
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=2048
+	// +kubebuilder:validation:XValidation:rule="matches(self, '^arn:(aws|aws-cn|aws-us-gov|aws-iso|aws-iso-b|aws-iso-e|aws-iso-f):kms:[a-z0-9-]+:[0-9]{12}:(key|alias)/.*$')",message="kmsKeyARN must be a valid AWS KMS key ARN in the format: arn:<partition>:kms:<region>:<account-id>:(key|alias)/<key-id-or-alias>"
+	// +openshift:validation:FeatureGateAwareXValidation:featureGate=AWSEuropeanSovereignCloudInstall,rule="matches(self, '^arn:(aws|aws-cn|aws-us-gov|aws-iso|aws-iso-b|aws-iso-e|aws-iso-f|aws-eusc):kms:[a-z0-9-]+:[0-9]{12}:(key|alias)/.*$')",message="kmsKeyARN must be a valid AWS KMS key ARN in the format: arn:<partition>:kms:<region>:<account-id>:(key|alias)/<key-id-or-alias>"
+	KMSKeyARN string `json:"kmsKeyARN,omitempty"`
+}
