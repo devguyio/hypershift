@@ -1,0 +1,420 @@
+// HyperShift Condition Propagation Graph
+// Render: dot -Tsvg condition-propagation.dot -o condition-propagation.svg
+//
+// Legend:
+//   solid arrow   = DIRECT_COPY
+//   dashed arrow   = AGGREGATE
+//   bold red arrow = INVERT
+//   dotted arrow   = REMOVE_WHEN_UNKNOWN / DEFAULT_TRUE_IF_ABSENT
+
+digraph ConditionPropagation {
+  rankdir=LR;
+  splines=ortho;
+  nodesep=0.3;
+  ranksep=1.2;
+  fontname="Inter, Helvetica, sans-serif";
+  node [shape=box, style="rounded,filled", fontsize=10, fontname="Inter, Helvetica, sans-serif", margin="0.15,0.06"];
+  edge [fontsize=8, fontname="Inter, Helvetica, sans-serif"];
+
+  // ================================================================
+  // COLOR SCHEME
+  // ================================================================
+  // Platform colors for subgraph backgrounds
+  // AWS=#fff8e1, Azure=#e3f2fd, GCP=#e8f5e9, KubeVirt=#f3e5f5
+
+  // ================================================================
+  // COLUMN 0: DEEP (Sources)
+  // ================================================================
+
+  subgraph cluster_co {
+    label="ClusterOperator (CO)";
+    style="rounded,filled"; fillcolor="#1e293b"; fontcolor="#94a3b8"; color="#334155";
+
+    co_Available [label="Available\n(healthy=True)", fillcolor="#22c55e20", color="#22c55e"];
+    co_Progressing [label="Progressing\n(healthy=False)", fillcolor="#22c55e20", color="#22c55e"];
+    co_Degraded [label="Degraded\n(healthy=False)", fillcolor="#22c55e20", color="#22c55e"];
+    co_Upgradeable [label="Upgradeable\n(healthy=True)", fillcolor="#22c55e20", color="#22c55e"];
+  }
+
+  subgraph cluster_awsmachine {
+    label="AWSMachine [AWS]";
+    style="rounded,filled"; fillcolor="#1e293b"; fontcolor="#f59e0b"; color="#f59e0b44";
+
+    awsm_InstanceReady [label="InstanceReady", fillcolor="#f59e0b15", color="#f59e0b"];
+    awsm_SecurityGroupsReady [label="SecurityGroupsReady", fillcolor="#f59e0b15", color="#f59e0b"];
+    awsm_ELBAttached [label="ELBAttached\n(CP only)", fillcolor="#f59e0b15", color="#f59e0b"];
+    awsm_Ready [label="Ready", fillcolor="#f59e0b15", color="#f59e0b"];
+  }
+
+  subgraph cluster_kvmachine {
+    label="KubevirtMachine [KubeVirt]";
+    style="rounded,filled"; fillcolor="#1e293b"; fontcolor="#c084fc"; color="#c084fc44";
+
+    kvm_VMProvisioned [label="VMProvisioned", fillcolor="#c084fc15", color="#c084fc"];
+    kvm_BootstrapExecSucceeded [label="BootstrapExec\nSucceeded", fillcolor="#c084fc15", color="#c084fc"];
+    kvm_VMLiveMigratable [label="VMLiveMigratable\n(informational)", fillcolor="#c084fc15", color="#c084fc"];
+    kvm_Ready [label="Ready", fillcolor="#c084fc15", color="#c084fc"];
+  }
+
+  subgraph cluster_gcpmachine {
+    label="GCPMachine [GCP]";
+    style="rounded,filled"; fillcolor="#1e293b"; fontcolor="#4ade80"; color="#4ade8044";
+
+    gcpm_Ready [label="Ready\n(no sub-conditions;\nstatus.ready from\nGCE instance state)", fillcolor="#4ade8015", color="#4ade80"];
+  }
+
+  subgraph cluster_machine {
+    label="CAPI Machine (×N)";
+    style="rounded,filled"; fillcolor="#1e293b"; fontcolor="#94a3b8"; color="#334155";
+
+    mach_InfrastructureReady [label="InfrastructureReady"];
+    mach_BootstrapReady [label="BootstrapReady"];
+    mach_Ready [label="Ready"];
+    mach_NodeHealthy [label="NodeHealthy\n(NOT in Ready)"];
+    mach_VMLiveMigratable [label="VMLiveMigratable\n[KubeVirt]", fillcolor="#c084fc15", color="#c084fc"];
+  }
+
+  // ================================================================
+  // COLUMN 1: MID
+  // ================================================================
+
+  subgraph cluster_cv {
+    label="ClusterVersion (CV)";
+    style="rounded,filled"; fillcolor="#1e293b"; fontcolor="#94a3b8"; color="#334155";
+
+    cv_Failing [label="Failing\n(healthy=False)", fillcolor="#22c55e20", color="#22c55e"];
+    cv_Available [label="Available", fillcolor="#22c55e20", color="#22c55e"];
+    cv_Progressing [label="Progressing\n(healthy=False)", fillcolor="#22c55e20", color="#22c55e"];
+    cv_Upgradeable [label="Upgradeable", fillcolor="#22c55e20", color="#22c55e"];
+    cv_ReleaseAccepted [label="ReleaseAccepted", fillcolor="#22c55e20", color="#22c55e"];
+    cv_RetrievedUpdates [label="RetrievedUpdates", fillcolor="#22c55e20", color="#22c55e"];
+  }
+
+  subgraph cluster_ms {
+    label="MachineSet (MS)";
+    style="rounded,filled"; fillcolor="#1e293b"; fontcolor="#94a3b8"; color="#334155";
+
+    ms_MachinesReady [label="MachinesReady"];
+    ms_MachinesCreated [label="MachinesCreated"];
+    ms_Resized [label="Resized"];
+    ms_Ready [label="Ready"];
+  }
+
+  subgraph cluster_md {
+    label="MachineDeployment (MD)";
+    style="rounded,filled"; fillcolor="#1e293b"; fontcolor="#94a3b8"; color="#334155";
+
+    md_Available [label="Available"];
+    md_MachineSetReady [label="MachineSetReady\n(informational)"];
+    md_Ready [label="Ready"];
+  }
+
+  subgraph cluster_perfprofile {
+    label="PerformanceProfile";
+    style="rounded,filled"; fillcolor="#1e293b"; fontcolor="#94a3b8"; color="#334155";
+
+    pp_Available [label="Available"];
+    pp_Progressing [label="Progressing\n(healthy=False)"];
+    pp_Upgradeable [label="Upgradeable"];
+    pp_Degraded [label="Degraded\n(healthy=False)"];
+  }
+
+  // ================================================================
+  // COLUMN 2: NEAR
+  // ================================================================
+
+  subgraph cluster_hcp {
+    label="HostedControlPlane (HCP)";
+    style="rounded,filled"; fillcolor="#1e293b"; fontcolor="#94a3b8"; color="#334155";
+
+    // CVO conditions
+    hcp_CVFailing [label="ClusterVersion\nFailing", fillcolor="#22c55e20", color="#22c55e"];
+    hcp_CVAvailable [label="ClusterVersion\nAvailable", fillcolor="#22c55e20", color="#22c55e"];
+    hcp_CVProgressing [label="ClusterVersion\nProgressing", fillcolor="#22c55e20", color="#22c55e"];
+    hcp_CVUpgradeable [label="ClusterVersion\nUpgradeable", fillcolor="#22c55e20", color="#22c55e"];
+    hcp_CVReleaseAccepted [label="ClusterVersion\nReleaseAccepted", fillcolor="#22c55e20", color="#22c55e"];
+    hcp_CVRetrievedUpdates [label="ClusterVersion\nRetrievedUpdates", fillcolor="#22c55e20", color="#22c55e"];
+
+    // Infrastructure
+    hcp_InfraReady [label="InfrastructureReady"];
+    hcp_KASAvailable [label="KubeAPIServer\nAvailable"];
+    hcp_EtcdAvailable [label="EtcdAvailable"];
+    hcp_Available [label="Available\n(composite)"];
+
+    // Other
+    hcp_Degraded [label="Degraded"];
+    hcp_ExternalDNS [label="ExternalDNS\nReachable"];
+    hcp_ValidConfig [label="ValidConfiguration"];
+    hcp_ValidRelease [label="ValidReleaseInfo"];
+    hcp_ValidIDP [label="ValidIDP\nConfiguration"];
+    hcp_DataPlaneConn [label="DataPlane\nConnectionAvailable"];
+    hcp_CtrlPlaneConn [label="ControlPlane\nConnectionAvailable"];
+    hcp_EtcdBackup [label="EtcdBackup\nSucceeded"];
+    hcp_ConfigOpRecon [label="ConfigOperator\nReconciliation"];
+    hcp_RestoredFromBackup [label="HostedCluster\nRestoredFromBackup"];
+    hcp_EtcdEncryption [label="EtcdDataEncryption\nUpToDate"];
+
+    // Platform-specific
+    hcp_ValidAWSIdP [label="ValidAWS\nIdentityProvider", fillcolor="#f59e0b15", color="#f59e0b"];
+    hcp_ValidAWSKMS [label="ValidAWSKMS\nConfig", fillcolor="#f59e0b15", color="#f59e0b"];
+    hcp_AWSSGCreated [label="AWSDefaultSG\nCreated", fillcolor="#f59e0b15", color="#f59e0b"];
+    hcp_ValidAzureKMS [label="ValidAzureKMS\nConfig", fillcolor="#38bdf815", color="#38bdf8"];
+    hcp_ValidKVMTU [label="ValidKubeVirt\nInfraNetworkMTU", fillcolor="#c084fc15", color="#c084fc"];
+  }
+
+  // ================================================================
+  // COLUMN 3: SURFACE (User-facing)
+  // ================================================================
+
+  subgraph cluster_hc {
+    label="HostedCluster (HC) — USER FACING";
+    style="rounded,filled"; fillcolor="#0f172a"; fontcolor="#38bdf8"; color="#38bdf8"; penwidth=2;
+
+    // CVO
+    hc_CVSucceeding [label="ClusterVersion\nSucceeding"];
+    hc_CVAvailable [label="ClusterVersion\nAvailable"];
+    hc_CVProgressing [label="ClusterVersion\nProgressing"];
+    hc_CVUpgradeable [label="ClusterVersion\nUpgradeable"];
+    hc_CVReleaseAccepted [label="ClusterVersion\nReleaseAccepted"];
+    hc_CVRetrievedUpdates [label="ClusterVersion\nRetrievedUpdates"];
+
+    // Health
+    hc_Available [label="Available"];
+    hc_Degraded [label="Degraded"];
+    hc_Progressing [label="Progressing\n(HC-only)"];
+
+    // Infrastructure
+    hc_InfraReady [label="Infrastructure\nReady"];
+    hc_KASAvailable [label="KubeAPIServer\nAvailable"];
+    hc_EtcdAvailable [label="EtcdAvailable"];
+    hc_ExternalDNS [label="ExternalDNS\nReachable"];
+    hc_IgnitionEndpoint [label="IgnitionEndpoint\nAvailable (HC-only)"];
+    hc_EtcdBackup [label="EtcdBackup\nSucceeded"];
+    hc_EtcdEncryption [label="EtcdDataEncryption\nUpToDate"];
+
+    // Validation (HC-only)
+    hc_ValidConfig [label="ValidConfiguration\n(HC-only)"];
+    hc_Supported [label="SupportedHosted\nCluster (HC-only)"];
+    hc_ValidProxy [label="ValidProxy\nConfig (HC-only)"];
+    hc_ValidRelease [label="ValidReleaseImage\n(HC-only)"];
+    hc_ValidOIDC [label="ValidOIDC\nConfig [AWS]", fillcolor="#f59e0b15", color="#f59e0b"];
+    hc_PlatformCreds [label="PlatformCredentials\nFound (HC-only)"];
+
+    // Propagated
+    hc_ValidHCPConfig [label="ValidHCP\nConfiguration"];
+    hc_ValidReleaseInfo [label="ValidReleaseInfo"];
+    hc_ValidIDP [label="ValidIDP\nConfiguration"];
+    hc_DataPlaneConn [label="DataPlane\nConnectionAvailable"];
+    hc_CtrlPlaneConn [label="ControlPlane\nConnectionAvailable"];
+    hc_ConfigOpRecon [label="ConfigOperator\nReconciliation"];
+    hc_RestoredFromBackup [label="HostedCluster\nRestoredFromBackup"];
+    hc_ReconciliationActive [label="Reconciliation\nActive (HC-only)"];
+    hc_ReconciliationSucceeded [label="Reconciliation\nSucceeded (HC-only)"];
+
+    // Platform
+    hc_ValidAWSIdP [label="ValidAWS\nIdentityProvider", fillcolor="#f59e0b15", color="#f59e0b"];
+    hc_ValidAWSKMS [label="ValidAWSKMS\nConfig", fillcolor="#f59e0b15", color="#f59e0b"];
+    hc_AWSSGCreated [label="AWSDefaultSG\nCreated", fillcolor="#f59e0b15", color="#f59e0b"];
+    hc_ValidAzureKMS [label="ValidAzureKMS\nConfig", fillcolor="#38bdf815", color="#38bdf8"];
+    hc_ValidKVMTU [label="ValidKubeVirt\nInfraNetworkMTU", fillcolor="#c084fc15", color="#c084fc"];
+    hc_KVLiveMigratable [label="KubeVirtNodes\nLiveMigratable", fillcolor="#c084fc15", color="#c084fc"];
+    hc_AWSEndpoint [label="AWSEndpoint\nAvailable", fillcolor="#f59e0b15", color="#f59e0b"];
+    hc_AWSEndpointSvc [label="AWSEndpointService\nAvailable", fillcolor="#f59e0b15", color="#f59e0b"];
+    hc_ValidGCPCreds [label="ValidGCP\nCredentials", fillcolor="#4ade8015", color="#4ade80"];
+    hc_ValidGCPWIF [label="ValidGCPWorkload\nIdentity", fillcolor="#4ade8015", color="#4ade80"];
+  }
+
+  subgraph cluster_np {
+    label="NodePool (NP) — USER FACING";
+    style="rounded,filled"; fillcolor="#0f172a"; fontcolor="#38bdf8"; color="#38bdf8"; penwidth=2;
+
+    np_Ready [label="Ready"];
+    np_AllMachinesReady [label="AllMachinesReady"];
+    np_AllNodesHealthy [label="AllNodesHealthy"];
+    np_ValidReleaseImage [label="ValidReleaseImage"];
+    np_ValidMachineConfig [label="ValidMachineConfig"];
+    np_ValidTuningConfig [label="ValidTuningConfig"];
+    np_ValidPlatformConfig [label="ValidPlatformConfig"];
+    np_UpdateMgmtEnabled [label="UpdateMgmt\nEnabled"];
+    np_AutoscalingEnabled [label="Autoscaling\nEnabled"];
+    np_ReconciliationActive [label="Reconciliation\nActive"];
+    np_ValidGenPayload [label="ValidGenerated\nPayload"];
+    np_ReachedIgnition [label="ReachedIgnition\nEndpoint"];
+    np_UpdatingVersion [label="UpdatingVersion\n(healthy=False)"];
+    np_UpdatingConfig [label="UpdatingConfig\n(healthy=False)"];
+    np_UpdatingPlatformMT [label="UpdatingPlatform\nMachineTemplate"];
+    np_SupportedVersionSkew [label="SupportedVersion\nSkew"];
+    np_ValidArchPlatform [label="ValidArch\nPlatform"];
+    np_AutorepairEnabled [label="Autorepair\nEnabled"];
+    np_ValidPlatformImage [label="ValidPlatform\nImage"];
+    np_AWSSGAvailable [label="AWSSecurityGroup\nAvailable", fillcolor="#f59e0b15", color="#f59e0b"];
+    np_KVLiveMigratable [label="KubeVirtNodes\nLiveMigratable", fillcolor="#c084fc15", color="#c084fc"];
+    np_PerfAvailable [label="perf-operator/\nAvailable"];
+    np_PerfProgressing [label="perf-operator/\nProgressing"];
+    np_PerfUpgradeable [label="perf-operator/\nUpgradeable"];
+    np_PerfDegraded [label="perf-operator/\nDegraded"];
+  }
+
+  // ================================================================
+  // EDGES: CO → CV (CVO internal)
+  // ================================================================
+
+  co_Available -> cv_Available [style=dashed, label="AGGREGATE\n(via payload sync)", color="#64748b"];
+  co_Available -> cv_Failing [style=dashed, label="AGGREGATE\n(NotAvail→immediate fail)", color="#64748b"];
+  co_Progressing -> cv_Progressing [style=dashed, label="AGGREGATE\n(via sync state)", color="#64748b"];
+  co_Degraded -> cv_Failing [style=dashed, label="AGGREGATE\n(40min timeout)", color="#64748b"];
+  co_Upgradeable -> cv_Upgradeable [style=dashed, label="AGGREGATE\n(ANY False blocks)", color="#64748b"];
+
+  // ================================================================
+  // EDGES: AWSMachine internal
+  // ================================================================
+
+  awsm_InstanceReady -> awsm_Ready [style=dashed, label="AGGREGATE", color="#f59e0b"];
+  awsm_SecurityGroupsReady -> awsm_Ready [style=dashed, label="AGGREGATE", color="#f59e0b"];
+  awsm_ELBAttached -> awsm_Ready [style=dashed, label="AGGREGATE", color="#f59e0b"];
+
+  // ================================================================
+  // EDGES: KubevirtMachine internal
+  // ================================================================
+
+  kvm_VMProvisioned -> kvm_Ready [style=dashed, label="AGGREGATE", color="#c084fc"];
+  kvm_BootstrapExecSucceeded -> kvm_Ready [style=dashed, label="AGGREGATE", color="#c084fc"];
+
+  // ================================================================
+  // EDGES: InfrastructureMachine → Machine
+  // ================================================================
+
+  awsm_Ready -> mach_InfrastructureReady [label="MIRROR\n[AWS]", color="#f59e0b"];
+  kvm_Ready -> mach_InfrastructureReady [label="MIRROR\n[KubeVirt]", color="#c084fc"];
+  gcpm_Ready -> mach_InfrastructureReady [label="MIRROR\n[GCP]", color="#4ade80"];
+  kvm_VMLiveMigratable -> mach_VMLiveMigratable [label="DIRECT_COPY\n[KubeVirt]", color="#c084fc"];
+
+  // ================================================================
+  // EDGES: Machine internal
+  // ================================================================
+
+  mach_InfrastructureReady -> mach_Ready [style=dashed, label="AGGREGATE"];
+  mach_BootstrapReady -> mach_Ready [style=dashed, label="AGGREGATE"];
+
+  // ================================================================
+  // EDGES: Machine → MachineSet
+  // ================================================================
+
+  mach_Ready -> ms_MachinesReady [style=dashed, label="AGGREGATE\n(all Machines)"];
+
+  // ================================================================
+  // EDGES: MachineSet internal
+  // ================================================================
+
+  ms_MachinesReady -> ms_Ready [style=dashed, label="AGGREGATE"];
+  ms_MachinesCreated -> ms_Ready [style=dashed, label="AGGREGATE"];
+  ms_Resized -> ms_Ready [style=dashed, label="AGGREGATE"];
+
+  // ================================================================
+  // EDGES: MachineSet → MachineDeployment
+  // ================================================================
+
+  ms_Ready -> md_MachineSetReady [label="MIRROR\n(informational)"];
+
+  // ================================================================
+  // EDGES: MachineDeployment internal
+  // ================================================================
+
+  md_Available -> md_Ready [style=dashed, label="AGGREGATE"];
+
+  // ================================================================
+  // EDGES: Machine → NodePool (direct, skipping MS/MD)
+  // ================================================================
+
+  mach_NodeHealthy -> np_AllNodesHealthy [style=dashed, label="AGGREGATE\n(all Machines)"];
+  mach_VMLiveMigratable -> np_KVLiveMigratable [style=dashed, label="AGGREGATE\n[KubeVirt]", color="#c084fc"];
+
+  // ================================================================
+  // EDGES: MD/MS → NodePool
+  // ================================================================
+
+  md_Ready -> np_Ready [label="DIRECT_COPY\n(Replace upgrade)"];
+  ms_Ready -> np_Ready [label="DIRECT_COPY\n(InPlace upgrade)", style=dotted];
+
+  // ================================================================
+  // EDGES: NodePool internal
+  // ================================================================
+
+  np_ReachedIgnition -> np_AutorepairEnabled [style=dashed, label="AGGREGATE\n(gate)"];
+  np_AutorepairEnabled -> np_Ready [style=dashed, label="AGGREGATE\n(MHC override)"];
+
+  // ================================================================
+  // EDGES: PerformanceProfile → NodePool
+  // ================================================================
+
+  pp_Available -> np_PerfAvailable [label="DIRECT_COPY"];
+  pp_Progressing -> np_PerfProgressing [label="DIRECT_COPY"];
+  pp_Upgradeable -> np_PerfUpgradeable [label="DIRECT_COPY"];
+  pp_Degraded -> np_PerfDegraded [label="DIRECT_COPY"];
+
+  // ================================================================
+  // EDGES: NodePool → HostedCluster
+  // ================================================================
+
+  np_KVLiveMigratable -> hc_KVLiveMigratable [style=dashed, label="AGGREGATE\n(all NodePools)\n[KubeVirt]", color="#c084fc"];
+
+  // ================================================================
+  // EDGES: CV → HCP (HCCO hcpstatus controller)
+  // ================================================================
+
+  cv_Failing -> hcp_CVFailing [label="DIRECT_COPY"];
+  cv_Available -> hcp_CVAvailable [label="DIRECT_COPY"];
+  cv_Progressing -> hcp_CVProgressing [label="DIRECT_COPY"];
+  cv_Upgradeable -> hcp_CVUpgradeable [label="DEFAULT_TRUE\nIF_ABSENT", style=dotted];
+  cv_ReleaseAccepted -> hcp_CVReleaseAccepted [label="DIRECT_COPY"];
+  cv_RetrievedUpdates -> hcp_CVRetrievedUpdates [label="DIRECT_COPY"];
+
+  // ================================================================
+  // EDGES: HCP internal (Available is composite)
+  // ================================================================
+
+  hcp_InfraReady -> hcp_Available [style=dashed, label="AGGREGATE"];
+  hcp_EtcdAvailable -> hcp_Available [style=dashed, label="AGGREGATE"];
+  hcp_KASAvailable -> hcp_Available [style=dashed, label="AGGREGATE"];
+
+  // ================================================================
+  // EDGES: HCP → HC (batch propagation)
+  // ================================================================
+
+  hcp_EtcdAvailable -> hc_EtcdAvailable [label="DIRECT_COPY"];
+  hcp_KASAvailable -> hc_KASAvailable [label="DIRECT_COPY"];
+  hcp_InfraReady -> hc_InfraReady [label="DIRECT_COPY"];
+  hcp_ExternalDNS -> hc_ExternalDNS [label="DIRECT_COPY"];
+  hcp_ValidConfig -> hc_ValidHCPConfig [label="DIRECT_COPY"];
+  hcp_ValidRelease -> hc_ValidReleaseInfo [label="DIRECT_COPY"];
+  hcp_ValidIDP -> hc_ValidIDP [label="DIRECT_COPY"];
+  hcp_RestoredFromBackup -> hc_RestoredFromBackup [label="DIRECT_COPY"];
+  hcp_DataPlaneConn -> hc_DataPlaneConn [label="DIRECT_COPY"];
+  hcp_CtrlPlaneConn -> hc_CtrlPlaneConn [label="DIRECT_COPY"];
+  hcp_EtcdBackup -> hc_EtcdBackup [label="DIRECT_COPY"];
+  hcp_ConfigOpRecon -> hc_ConfigOpRecon [label="DIRECT_COPY"];
+
+  // ================================================================
+  // EDGES: HCP → HC (CVO conditions with transformations)
+  // ================================================================
+
+  hcp_CVFailing -> hc_CVSucceeding [label="INVERT\n(True↔False)", color="#ef4444", penwidth=2, fontcolor="#ef4444"];
+  hcp_CVProgressing -> hc_CVProgressing [label="DIRECT_COPY"];
+  hcp_CVReleaseAccepted -> hc_CVReleaseAccepted [label="DIRECT_COPY"];
+  hcp_CVRetrievedUpdates -> hc_CVRetrievedUpdates [label="REMOVE_WHEN\nUNKNOWN", style=dashed];
+  hcp_CVUpgradeable -> hc_CVUpgradeable [label="DIRECT_COPY"];
+  hcp_CVAvailable -> hc_CVAvailable [label="DIRECT_COPY"];
+
+  // ================================================================
+  // EDGES: HCP → HC (special cases)
+  // ================================================================
+
+  hcp_Degraded -> hc_Degraded [label="RENAME"];
+  hcp_Available -> hc_Available [label="RECOMPUTE"];
+  hcp_ValidAWSIdP -> hc_ValidAWSIdP [label="DIRECT_COPY", color="#f59e0b"];
+  hcp_ValidAWSKMS -> hc_ValidAWSKMS [label="DIRECT_COPY", color="#f59e0b"];
+  hcp_AWSSGCreated -> hc_AWSSGCreated [label="DIRECT_COPY", color="#f59e0b"];
+  hcp_ValidAzureKMS -> hc_ValidAzureKMS [label="DIRECT_COPY", color="#38bdf8"];
+  hcp_ValidKVMTU -> hc_ValidKVMTU [label="DIRECT_COPY", color="#c084fc"];
+  hcp_EtcdEncryption -> hc_EtcdEncryption [label="DIRECT_COPY"];
+}

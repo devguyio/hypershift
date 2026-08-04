@@ -1,0 +1,1657 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HyperShift Condition Flow Explorer</title>
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<style>
+/* ============================================================
+   CSS CUSTOM PROPERTIES (THEMING)
+   ============================================================ */
+:root {
+  --bg: #0f172a;
+  --bg-surface: #1e293b;
+  --bg-card: #1e293b;
+  --bg-card-hover: #334155;
+  --text-primary: #f1f5f9;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+  --border: #334155;
+  --border-subtle: #1e293b;
+  --accent: #38bdf8;
+  --accent-dim: rgba(56, 189, 248, 0.15);
+  --line-color: rgba(148, 163, 184, 0.35);
+  --line-color-active: rgba(148, 163, 184, 0.9);
+  --scrollbar-thumb: #475569;
+  --scrollbar-track: #1e293b;
+  --shadow: 0 1px 3px rgba(0,0,0,0.4);
+  --green: #22c55e;
+  --red: #ef4444;
+  --amber: #f59e0b;
+  --grey: #6b7280;
+  --dim-opacity: 0.15;
+}
+
+.light-mode {
+  --bg: #f1f5f9;
+  --bg-surface: #ffffff;
+  --bg-card: #ffffff;
+  --bg-card-hover: #f8fafc;
+  --text-primary: #1e293b;
+  --text-secondary: #475569;
+  --text-muted: #94a3b8;
+  --border: #e2e8f0;
+  --border-subtle: #f1f5f9;
+  --accent: #0284c7;
+  --accent-dim: rgba(2, 132, 199, 0.1);
+  --line-color: rgba(71, 85, 105, 0.3);
+  --line-color-active: rgba(71, 85, 105, 0.85);
+  --scrollbar-thumb: #cbd5e1;
+  --scrollbar-track: #f1f5f9;
+  --shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+
+/* ============================================================
+   RESET AND BASE
+   ============================================================ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  height: 100%;
+  overflow: hidden;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text-primary);
+  transition: background 0.3s ease, color 0.3s ease;
+}
+
+/* ============================================================
+   SCROLLBAR STYLING
+   ============================================================ */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: var(--scrollbar-track); border-radius: 3px; }
+::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+/* ============================================================
+   HEADER
+   ============================================================ */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 24px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-surface);
+  flex-wrap: wrap;
+  gap: 10px;
+  z-index: 10;
+  position: relative;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.header-title {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+}
+
+.header-subtitle {
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.header-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+/* ============================================================
+   BUTTONS AND CONTROLS
+   ============================================================ */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-card);
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+.btn:hover { background: var(--bg-card-hover); border-color: var(--text-muted); }
+.btn.active { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
+
+.filter-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.filter-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+}
+
+.filter-select {
+  padding: 5px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-card);
+  color: var(--text-primary);
+  font-size: 12px;
+  cursor: pointer;
+  outline: none;
+}
+.filter-select:focus { border-color: var(--accent); }
+
+.toggle-switch {
+  position: relative;
+  width: 36px;
+  height: 20px;
+  background: var(--border);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.3s ease;
+}
+.toggle-switch.active { background: var(--accent); }
+.toggle-switch::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  background: white;
+  border-radius: 50%;
+  transition: transform 0.3s ease;
+}
+.toggle-switch.active::after { transform: translateX(16px); }
+
+.toggle-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+/* ============================================================
+   FILTER BAR
+   ============================================================ */
+.filter-bar {
+  display: flex;
+  align-items: center;
+  padding: 8px 24px;
+  gap: 16px;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg);
+  flex-wrap: wrap;
+}
+
+/* ============================================================
+   MAIN LAYOUT
+   ============================================================ */
+.main-container {
+  position: relative;
+  height: calc(100vh - 95px);
+  overflow: hidden;
+}
+
+.columns-wrapper {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0;
+  height: 100%;
+  padding: 0;
+  position: relative;
+}
+
+.column {
+  overflow-y: auto;
+  padding: 12px 14px;
+  border-right: 1px solid var(--border-subtle);
+  position: relative;
+}
+.column:last-child { border-right: none; }
+
+.column-header {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: var(--bg);
+  padding: 8px 0 10px 0;
+  margin-bottom: 4px;
+}
+
+.column-depth {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+/* ============================================================
+   RESOURCE GROUPS AND CONDITION BARS
+   ============================================================ */
+.resource-group {
+  margin-bottom: 16px;
+}
+
+.resource-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0 4px 0;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.resource-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.resource-shortname {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-muted);
+  background: var(--bg-surface);
+  padding: 1px 6px;
+  border-radius: 3px;
+}
+
+.condition-bar {
+  display: flex;
+  align-items: center;
+  padding: 5px 10px 5px 0;
+  margin: 2px 0;
+  border-radius: 5px;
+  background: var(--bg-card);
+  cursor: pointer;
+  transition: all 0.3s ease;
+  border: 1px solid transparent;
+  min-height: 30px;
+  position: relative;
+}
+.condition-bar:hover {
+  background: var(--bg-card-hover);
+  border-color: var(--border);
+}
+.condition-bar.selected {
+  border-color: var(--accent);
+  background: var(--accent-dim);
+}
+.condition-bar.dimmed {
+  opacity: var(--dim-opacity);
+}
+.condition-bar.highlighted {
+  border-color: var(--accent);
+  box-shadow: 0 0 8px rgba(56, 189, 248, 0.25);
+}
+.condition-bar.hidden-by-filter {
+  display: none;
+}
+
+.status-strip {
+  width: 4px;
+  min-height: 22px;
+  align-self: stretch;
+  border-radius: 5px 0 0 5px;
+  margin-right: 8px;
+  flex-shrink: 0;
+  transition: background 0.3s ease;
+}
+.status-strip.status-true { background: var(--green); }
+.status-strip.status-false { background: var(--red); }
+.status-strip.status-unknown { background: var(--amber); }
+.status-strip.status-absent { background: var(--grey); }
+
+.condition-name {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-primary);
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.condition-instance {
+  font-size: 9px;
+  color: var(--text-muted);
+  margin-left: 4px;
+}
+
+.condition-bar.cascade-pulse {
+  animation: bar-pulse 0.8s ease-in-out 4;
+}
+@keyframes bar-pulse {
+  0%, 100% { box-shadow: none; }
+  50% { box-shadow: 0 0 8px 2px var(--accent), inset 0 0 4px var(--accent); }
+}
+
+.condition-value {
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-left: auto;
+  flex-shrink: 0;
+  font-weight: 500;
+}
+
+.condition-platform-badge {
+  font-size: 8px;
+  font-weight: 700;
+  padding: 0 4px;
+  border-radius: 3px;
+  margin-left: 6px;
+  flex-shrink: 0;
+  text-transform: uppercase;
+}
+.platform-aws { color: #f59e0b; background: rgba(245,158,11,0.15); }
+.platform-azure { color: #38bdf8; background: rgba(56,189,248,0.15); }
+.platform-gcp { color: #4ade80; background: rgba(74,222,128,0.15); }
+.platform-kubevirt { color: #c084fc; background: rgba(192,132,252,0.15); }
+.platform-powervs { color: #f87171; background: rgba(248,113,113,0.15); }
+.platform-openstack { color: #fb923c; background: rgba(251,146,60,0.15); }
+.platform-agent { color: #a78bfa; background: rgba(167,139,250,0.15); }
+
+.condition-bar {
+  cursor: pointer;
+}
+
+/* ============================================================
+   SVG LINES OVERLAY
+   ============================================================ */
+#lines-svg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 4;
+}
+
+.edge-line {
+  fill: none;
+  stroke: var(--line-color);
+  stroke-width: 1.5;
+  transition: stroke-opacity 0.3s ease, stroke 0.3s ease;
+}
+.edge-line.dashed {
+  stroke-dasharray: 6, 4;
+}
+.edge-line.dotted {
+  stroke-dasharray: 2, 4;
+}
+.edge-line.active-line {
+  stroke: var(--line-color-active);
+  stroke-width: 2;
+}
+.edge-line.dimmed-line {
+  stroke-opacity: 0.06;
+}
+.edge-line.cascading {
+  stroke: var(--accent);
+  stroke-width: 3;
+  stroke-opacity: 1;
+  animation: line-pulse 0.8s ease-in-out 4;
+}
+@keyframes line-pulse {
+  0%, 100% { stroke-opacity: 0.4; stroke-width: 2; }
+  50% { stroke-opacity: 1; stroke-width: 3.5; }
+}
+.edge-decorator {
+  font-size: 12px;
+  fill: var(--text-secondary);
+  text-anchor: middle;
+  dominant-baseline: central;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+.edge-decorator.dimmed-line {
+  opacity: 0.06;
+}
+.edge-decorator.active-line {
+  fill: var(--accent);
+}
+
+/* ============================================================
+   CASCADE ANIMATION (SIMULATE MODE)
+   ============================================================ */
+@keyframes pulse-glow {
+  0% { stroke: var(--accent); stroke-opacity: 1; stroke-width: 3; }
+  100% { stroke: var(--line-color-active); stroke-opacity: 0.8; stroke-width: 1.5; }
+}
+.edge-line.cascading {
+  animation: pulse-glow 0.5s ease-out forwards;
+}
+
+/* ============================================================
+   LEGEND AND INFO
+   ============================================================ */
+.legend {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 24px;
+  border-top: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+  font-size: 10px;
+  color: var(--text-muted);
+  flex-wrap: wrap;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.legend-swatch {
+  width: 12px;
+  height: 4px;
+  border-radius: 2px;
+}
+
+.legend-line {
+  width: 24px;
+  height: 2px;
+  border-radius: 1px;
+}
+.legend-line.solid { background: var(--text-muted); }
+.legend-line.dashed {
+  background: repeating-linear-gradient(90deg, var(--text-muted) 0 6px, transparent 6px 10px);
+}
+.legend-line.dotted {
+  background: repeating-linear-gradient(90deg, var(--text-muted) 0 2px, transparent 2px 6px);
+}
+
+/* ============================================================
+   TOOLTIP
+   ============================================================ */
+.tooltip {
+  position: fixed;
+  padding: 8px 12px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 11px;
+  color: var(--text-primary);
+  pointer-events: none;
+  z-index: 100;
+  max-width: 300px;
+  display: none;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  line-height: 1.5;
+}
+.tooltip .tt-type {
+  font-weight: 600;
+  color: var(--accent);
+}
+.tooltip .tt-label {
+  color: var(--text-secondary);
+}
+</style>
+</head>
+<body>
+
+<!-- ============================================================
+     HEADER
+     ============================================================ -->
+<div class="header">
+  <div class="header-left">
+    <div>
+      <div class="header-title">Condition Flow Explorer</div>
+      <div class="header-subtitle">HyperShift status condition propagation</div>
+    </div>
+  </div>
+  <div class="header-controls">
+    <div class="filter-group">
+      <span class="filter-label">Platform</span>
+      <select class="filter-select" id="platform-filter">
+        <option value="All">All</option>
+        <option value="Core">Core</option>
+        <option value="AWS">AWS</option>
+        <option value="Azure">Azure</option>
+        <option value="GCP">GCP</option>
+        <option value="KubeVirt">KubeVirt</option>
+        <option value="PowerVS">PowerVS</option>
+        <option value="OpenStack">OpenStack</option>
+        <option value="Agent">Agent</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <span class="filter-label">Category</span>
+      <select class="filter-select" id="category-filter">
+        <option value="All">All</option>
+        <option value="health">Health</option>
+        <option value="cvo">CVO</option>
+        <option value="lifecycle">Lifecycle</option>
+        <option value="validation">Validation</option>
+        <option value="infrastructure">Infrastructure</option>
+        <option value="platform">Platform</option>
+        <option value="dataplane">DataPlane</option>
+        <option value="perfprofile">PerfProfile</option>
+      </select>
+    </div>
+    <div style="width:1px;height:20px;background:var(--border);margin:0 4px"></div>
+    <button class="btn" id="reset-btn">Reset All</button>
+    <div style="width:1px;height:20px;background:var(--border);margin:0 4px"></div>
+    <div class="toggle-group">
+      <span id="theme-label">Light</span>
+      <div class="toggle-switch" id="theme-toggle" title="Toggle light/dark mode"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
+     MAIN COLUMNS + SVG OVERLAY
+     ============================================================ -->
+<div class="main-container" id="main-container">
+  <div class="columns-wrapper" id="columns-wrapper">
+    <div class="column" id="col-0" data-col="0">
+      <div class="column-header"><span class="column-depth">Deep</span></div>
+    </div>
+    <div class="column" id="col-1" data-col="1">
+      <div class="column-header"><span class="column-depth">Mid</span></div>
+    </div>
+    <div class="column" id="col-2" data-col="2">
+      <div class="column-header"><span class="column-depth">Near</span></div>
+    </div>
+    <div class="column" id="col-3" data-col="3">
+      <div class="column-header"><span class="column-depth">Surface</span></div>
+    </div>
+  </div>
+  <svg id="lines-svg"></svg>
+</div>
+
+<!-- ============================================================
+     LEGEND
+     ============================================================ -->
+<div class="legend">
+  <span style="font-weight:600;margin-right:4px">Status:</span>
+  <div class="legend-item"><div class="legend-swatch" style="background:var(--green)"></div><span>True/Healthy</span></div>
+  <div class="legend-item"><div class="legend-swatch" style="background:var(--red)"></div><span>False/Unhealthy</span></div>
+  <div class="legend-item"><div class="legend-swatch" style="background:var(--amber)"></div><span>Unknown</span></div>
+  <div class="legend-item"><div class="legend-swatch" style="background:var(--grey)"></div><span>Absent</span></div>
+  <span style="width:1px;height:14px;background:var(--border);margin:0 6px"></span>
+  <span style="font-weight:600;margin-right:4px">Lines:</span>
+  <div class="legend-item"><div class="legend-line solid"></div><span>Direct</span></div>
+  <div class="legend-item"><div class="legend-line dashed"></div><span>RemoveWhenUnknown</span></div>
+  <div class="legend-item"><div class="legend-line dotted"></div><span>DefaultTrueIfAbsent</span></div>
+  <div class="legend-item"><span style="font-size:13px">&#8644;</span><span>Invert</span></div>
+  <div class="legend-item"><span style="font-size:13px">&#8853;</span><span>Aggregate</span></div>
+</div>
+
+<!-- ============================================================
+     TOOLTIP
+     ============================================================ -->
+<div class="tooltip" id="tooltip"></div>
+
+<script>
+/* ================================================================
+   DATA MODEL
+   ================================================================ */
+
+const RESOURCES = [
+  { id: 'co', name: 'ClusterOperator', shortName: 'CO', column: 0, chain: 'control' },
+  { id: 'machine', name: 'CAPI Machine', shortName: 'Machine', column: 0, chain: 'data' },
+  { id: 'cv', name: 'ClusterVersion', shortName: 'CV', column: 1, chain: 'control' },
+  { id: 'md', name: 'MachineDeployment', shortName: 'MD', column: 1, chain: 'data' },
+  { id: 'ms', name: 'MachineSet', shortName: 'MS', column: 1, chain: 'data' },
+  { id: 'perfprofile', name: 'PerformanceProfile', shortName: 'PerfProfile', column: 1, chain: 'data' },
+  { id: 'awsmachine', name: 'AWSMachine', shortName: 'AWSMachine', column: 0, chain: 'data', platform: 'AWS' },
+  { id: 'kvmachine', name: 'KubevirtMachine', shortName: 'KVMachine', column: 0, chain: 'data', platform: 'KubeVirt' },
+  { id: 'gcpmachine', name: 'GCPMachine', shortName: 'GCPMachine', column: 0, chain: 'data', platform: 'GCP' },
+  { id: 'azuremachine', name: 'AzureMachine', shortName: 'AzureMachine', column: 0, chain: 'data', platform: 'Azure' },
+  { id: 'openstackmachine', name: 'OpenStackMachine', shortName: 'OSMachine', column: 0, chain: 'data', platform: 'OpenStack' },
+  { id: 'powervsmachine', name: 'IBMPowerVSMachine', shortName: 'PVSMachine', column: 0, chain: 'data', platform: 'PowerVS' },
+  { id: 'agentmachine', name: 'AgentMachine', shortName: 'AgentMachine', column: 0, chain: 'data', platform: 'Agent' },
+  { id: 'hcp', name: 'HostedControlPlane', shortName: 'HCP', column: 2, chain: 'control' },
+  { id: 'hc', name: 'HostedCluster', shortName: 'HC', column: 3, chain: 'control', surface: true },
+  { id: 'np', name: 'NodePool', shortName: 'NP', column: 3, chain: 'data', surface: true },
+];
+
+const CONDITIONS = [
+  // ── ClusterOperator (co) — column 0 ──
+  { id: 'co-available', resource: 'co', name: 'Available', healthy: true, category: 'health' },
+  { id: 'co-progressing', resource: 'co', name: 'Progressing', healthy: false, category: 'lifecycle' },
+  { id: 'co-degraded', resource: 'co', name: 'Degraded', healthy: false, category: 'health' },
+  { id: 'co-upgradeable', resource: 'co', name: 'Upgradeable', healthy: true, category: 'lifecycle' },
+
+  // ── CAPI Machine (machine) — column 0 ──
+  { id: 'machine-ready-1', resource: 'machine', name: 'Ready', instance: '1', healthy: true, category: 'health' },
+  { id: 'machine-ready-2', resource: 'machine', name: 'Ready', instance: '2', healthy: true, category: 'health' },
+  { id: 'machine-ready-3', resource: 'machine', name: 'Ready', instance: '3', healthy: true, category: 'health' },
+  { id: 'machine-nodeHealthy-1', resource: 'machine', name: 'NodeHealthy', instance: '1', healthy: true, category: 'health' },
+  { id: 'machine-nodeHealthy-2', resource: 'machine', name: 'NodeHealthy', instance: '2', healthy: true, category: 'health' },
+  { id: 'machine-nodeHealthy-3', resource: 'machine', name: 'NodeHealthy', instance: '3', healthy: true, category: 'health' },
+  { id: 'machine-vmLiveMigratable-1', resource: 'machine', name: 'VMLiveMigratable', instance: '1', healthy: true, category: 'platform', platform: 'KubeVirt' },
+  { id: 'machine-vmLiveMigratable-2', resource: 'machine', name: 'VMLiveMigratable', instance: '2', healthy: true, category: 'platform', platform: 'KubeVirt' },
+  { id: 'machine-vmLiveMigratable-3', resource: 'machine', name: 'VMLiveMigratable', instance: '3', healthy: true, category: 'platform', platform: 'KubeVirt' },
+  { id: 'machine-infraReady-1', resource: 'machine', name: 'InfrastructureReady', healthy: true, category: 'infrastructure', instance: 1 },
+  { id: 'machine-infraReady-2', resource: 'machine', name: 'InfrastructureReady', healthy: true, category: 'infrastructure', instance: 2 },
+  { id: 'machine-infraReady-3', resource: 'machine', name: 'InfrastructureReady', healthy: true, category: 'infrastructure', instance: 3 },
+  { id: 'machine-bootstrapReady-1', resource: 'machine', name: 'BootstrapReady', healthy: true, category: 'infrastructure', instance: 1 },
+  { id: 'machine-bootstrapReady-2', resource: 'machine', name: 'BootstrapReady', healthy: true, category: 'infrastructure', instance: 2 },
+  { id: 'machine-bootstrapReady-3', resource: 'machine', name: 'BootstrapReady', healthy: true, category: 'infrastructure', instance: 3 },
+
+  // ── AWSMachine (awsmachine) — column 0, AWS ──
+  { id: 'awsmachine-instanceReady', resource: 'awsmachine', name: 'InstanceReady', healthy: true, category: 'infrastructure', platform: 'AWS' },
+  { id: 'awsmachine-securityGroupsReady', resource: 'awsmachine', name: 'SecurityGroupsReady', healthy: true, category: 'infrastructure', platform: 'AWS' },
+  { id: 'awsmachine-elbAttached', resource: 'awsmachine', name: 'ELBAttached', healthy: true, category: 'infrastructure', platform: 'AWS' },
+  { id: 'awsmachine-ready', resource: 'awsmachine', name: 'Ready', healthy: true, category: 'health', platform: 'AWS' },
+
+  // ── GCPMachine (gcpmachine) — column 0, GCP ──
+  // GCPMachine has no sub-conditions — just status.ready (set when GCE instance is Running)
+  { id: 'gcpmachine-ready', resource: 'gcpmachine', name: 'Ready', healthy: true, category: 'health', platform: 'GCP' },
+
+  // ── AzureMachine (azuremachine) — column 0, Azure ──
+  { id: 'azuremachine-vmRunning', resource: 'azuremachine', name: 'VMRunning', healthy: true, category: 'infrastructure', platform: 'Azure' },
+  { id: 'azuremachine-vmIdentitiesReady', resource: 'azuremachine', name: 'VMIdentitiesReady', healthy: true, category: 'infrastructure', platform: 'Azure' },
+  { id: 'azuremachine-bootstrapSucceeded', resource: 'azuremachine', name: 'BootstrapSucceeded', healthy: true, category: 'infrastructure', platform: 'Azure' },
+  { id: 'azuremachine-ready', resource: 'azuremachine', name: 'Ready', healthy: true, category: 'health', platform: 'Azure' },
+
+  // ── OpenStackMachine (openstackmachine) — column 0, OpenStack ──
+  { id: 'openstackmachine-instanceReady', resource: 'openstackmachine', name: 'InstanceReady', healthy: true, category: 'infrastructure', platform: 'OpenStack' },
+  { id: 'openstackmachine-ready', resource: 'openstackmachine', name: 'Ready', healthy: true, category: 'health', platform: 'OpenStack' },
+
+  // ── IBMPowerVSMachine (powervsmachine) — column 0, PowerVS ──
+  { id: 'powervsmachine-instanceReady', resource: 'powervsmachine', name: 'InstanceReady', healthy: true, category: 'infrastructure', platform: 'PowerVS' },
+  { id: 'powervsmachine-imageReady', resource: 'powervsmachine', name: 'ImageReady', healthy: true, category: 'infrastructure', platform: 'PowerVS' },
+  { id: 'powervsmachine-ready', resource: 'powervsmachine', name: 'Ready', healthy: true, category: 'health', platform: 'PowerVS' },
+
+  // ── AgentMachine (agentmachine) — column 0, Agent ──
+  { id: 'agentmachine-agentReserved', resource: 'agentmachine', name: 'AgentReserved', healthy: true, category: 'infrastructure', platform: 'Agent' },
+  { id: 'agentmachine-agentSpecSynced', resource: 'agentmachine', name: 'AgentSpecSynced', healthy: true, category: 'infrastructure', platform: 'Agent' },
+  { id: 'agentmachine-agentValidated', resource: 'agentmachine', name: 'AgentValidated', healthy: true, category: 'validation', platform: 'Agent' },
+  { id: 'agentmachine-agentRequirementsMet', resource: 'agentmachine', name: 'AgentRequirementsMet', healthy: true, category: 'validation', platform: 'Agent' },
+  { id: 'agentmachine-installed', resource: 'agentmachine', name: 'Installed', healthy: true, category: 'infrastructure', platform: 'Agent' },
+  { id: 'agentmachine-ready', resource: 'agentmachine', name: 'Ready', healthy: true, category: 'health', platform: 'Agent' },
+
+  // ── KubevirtMachine (kvmachine) — column 0, KubeVirt ──
+  { id: 'kvmachine-vmProvisioned', resource: 'kvmachine', name: 'VMProvisioned', healthy: true, category: 'infrastructure', platform: 'KubeVirt' },
+  { id: 'kvmachine-bootstrapExecSucceeded', resource: 'kvmachine', name: 'BootstrapExecSucceeded', healthy: true, category: 'infrastructure', platform: 'KubeVirt' },
+  { id: 'kvmachine-vmLiveMigratable', resource: 'kvmachine', name: 'VMLiveMigratable', healthy: true, category: 'platform', platform: 'KubeVirt' },
+  { id: 'kvmachine-ready', resource: 'kvmachine', name: 'Ready', healthy: true, category: 'health', platform: 'KubeVirt' },
+
+  // ── ClusterVersion (cv) — column 1 ──
+  { id: 'cv-failing', resource: 'cv', name: 'Failing', healthy: false, category: 'health' },
+  { id: 'cv-available', resource: 'cv', name: 'Available', healthy: true, category: 'health' },
+  { id: 'cv-progressing', resource: 'cv', name: 'Progressing', healthy: false, category: 'lifecycle' },
+  { id: 'cv-upgradeable', resource: 'cv', name: 'Upgradeable', healthy: true, category: 'lifecycle' },
+  { id: 'cv-releaseAccepted', resource: 'cv', name: 'ReleaseAccepted', healthy: true, category: 'cvo' },
+  { id: 'cv-retrievedUpdates', resource: 'cv', name: 'RetrievedUpdates', healthy: true, category: 'cvo' },
+
+  // ── MachineSet (ms) — column 1 ──
+  { id: 'ms-machinesReady', resource: 'ms', name: 'MachinesReady', healthy: true, category: 'health' },
+  { id: 'ms-machinesCreated', resource: 'ms', name: 'MachinesCreated', healthy: true, category: 'lifecycle' },
+  { id: 'ms-resized', resource: 'ms', name: 'Resized', healthy: true, category: 'lifecycle' },
+  { id: 'ms-ready', resource: 'ms', name: 'Ready', healthy: true, category: 'health' },
+
+  // ── MachineDeployment (md) — column 1 ──
+  { id: 'md-available', resource: 'md', name: 'Available', healthy: true, category: 'health' },
+  { id: 'md-machineSetReady', resource: 'md', name: 'MachineSetReady', healthy: true, category: 'health' },
+  { id: 'md-ready', resource: 'md', name: 'Ready', healthy: true, category: 'health' },
+
+  // ── PerformanceProfile (perfprofile) — column 1 ──
+  { id: 'perfprofile-available', resource: 'perfprofile', name: 'Available', healthy: true, category: 'perfprofile' },
+  { id: 'perfprofile-progressing', resource: 'perfprofile', name: 'Progressing', healthy: false, category: 'perfprofile' },
+  { id: 'perfprofile-upgradeable', resource: 'perfprofile', name: 'Upgradeable', healthy: true, category: 'perfprofile' },
+  { id: 'perfprofile-degraded', resource: 'perfprofile', name: 'Degraded', healthy: false, category: 'perfprofile' },
+
+  // ── HostedControlPlane (hcp) — column 2 ──
+  { id: 'hcp-clusterVersionFailing', resource: 'hcp', name: 'ClusterVersionFailing', healthy: false, category: 'cvo' },
+  { id: 'hcp-clusterVersionAvailable', resource: 'hcp', name: 'ClusterVersionAvailable', healthy: true, category: 'cvo' },
+  { id: 'hcp-clusterVersionProgressing', resource: 'hcp', name: 'ClusterVersionProgressing', healthy: false, category: 'cvo' },
+  { id: 'hcp-clusterVersionUpgradeable', resource: 'hcp', name: 'ClusterVersionUpgradeable', healthy: true, category: 'cvo' },
+  { id: 'hcp-clusterVersionReleaseAccepted', resource: 'hcp', name: 'ClusterVersionReleaseAccepted', healthy: true, category: 'cvo' },
+  { id: 'hcp-clusterVersionRetrievedUpdates', resource: 'hcp', name: 'ClusterVersionRetrievedUpdates', healthy: true, category: 'cvo' },
+  { id: 'hcp-available', resource: 'hcp', name: 'Available', healthy: true, category: 'health' },
+  { id: 'hcp-degraded', resource: 'hcp', name: 'Degraded', healthy: false, category: 'health' },
+  { id: 'hcp-infrastructureReady', resource: 'hcp', name: 'InfrastructureReady', healthy: true, category: 'infrastructure' },
+  { id: 'hcp-kubeAPIServerAvailable', resource: 'hcp', name: 'KubeAPIServerAvailable', healthy: true, category: 'infrastructure' },
+  { id: 'hcp-etcdAvailable', resource: 'hcp', name: 'EtcdAvailable', healthy: true, category: 'infrastructure' },
+  { id: 'hcp-externalDNSReachable', resource: 'hcp', name: 'ExternalDNSReachable', healthy: true, category: 'infrastructure' },
+  { id: 'hcp-validHostedControlPlaneConfiguration', resource: 'hcp', name: 'ValidConfiguration', healthy: true, category: 'validation' },
+  { id: 'hcp-validReleaseInfo', resource: 'hcp', name: 'ValidReleaseInfo', healthy: true, category: 'validation' },
+  { id: 'hcp-validIDPConfiguration', resource: 'hcp', name: 'ValidIDPConfiguration', healthy: true, category: 'validation' },
+  { id: 'hcp-dataPlaneConnectionAvailable', resource: 'hcp', name: 'DataPlaneConnectionAvailable', healthy: true, category: 'dataplane' },
+  { id: 'hcp-controlPlaneConnectionAvailable', resource: 'hcp', name: 'ControlPlaneConnectionAvailable', healthy: true, category: 'dataplane' },
+  { id: 'hcp-etcdBackupSucceeded', resource: 'hcp', name: 'EtcdBackupSucceeded', healthy: true, category: 'infrastructure' },
+  { id: 'hcp-configOperatorReconciliationSucceeded', resource: 'hcp', name: 'ConfigOperatorReconciliationSucceeded', healthy: true, category: 'lifecycle' },
+  { id: 'hcp-hostedClusterRestoredFromBackup', resource: 'hcp', name: 'HostedClusterRestoredFromBackup', healthy: true, category: 'lifecycle' },
+  { id: 'hcp-validAWSIdentityProvider', resource: 'hcp', name: 'ValidAWSIdentityProvider', healthy: true, category: 'platform', platform: 'AWS' },
+  { id: 'hcp-validAWSKMSConfig', resource: 'hcp', name: 'ValidAWSKMSConfig', healthy: true, category: 'platform', platform: 'AWS' },
+  { id: 'hcp-validAzureKMSConfig', resource: 'hcp', name: 'ValidAzureKMSConfig', healthy: true, category: 'platform', platform: 'Azure' },
+  { id: 'hcp-awsDefaultSecurityGroupCreated', resource: 'hcp', name: 'AWSDefaultSecurityGroupCreated', healthy: true, category: 'platform', platform: 'AWS' },
+  { id: 'hcp-validKubeVirtInfraNetworkMTU', resource: 'hcp', name: 'ValidKubeVirtInfraNetworkMTU', healthy: true, category: 'platform', platform: 'KubeVirt' },
+  { id: 'hcp-etcdDataEncryptionUpToDate', resource: 'hcp', name: 'EtcdDataEncryptionUpToDate', healthy: true, category: 'infrastructure' },
+
+  // ── HostedCluster (hc) — column 3, surface ──
+  { id: 'hc-clusterVersionSucceeding', resource: 'hc', name: 'ClusterVersionSucceeding', healthy: true, category: 'cvo' },
+  { id: 'hc-clusterVersionAvailable', resource: 'hc', name: 'ClusterVersionAvailable', healthy: true, category: 'cvo' },
+  { id: 'hc-clusterVersionProgressing', resource: 'hc', name: 'ClusterVersionProgressing', healthy: false, category: 'cvo' },
+  { id: 'hc-clusterVersionUpgradeable', resource: 'hc', name: 'ClusterVersionUpgradeable', healthy: true, category: 'cvo' },
+  { id: 'hc-clusterVersionReleaseAccepted', resource: 'hc', name: 'ClusterVersionReleaseAccepted', healthy: true, category: 'cvo' },
+  { id: 'hc-clusterVersionRetrievedUpdates', resource: 'hc', name: 'ClusterVersionRetrievedUpdates', healthy: true, category: 'cvo' },
+  { id: 'hc-available', resource: 'hc', name: 'Available', healthy: true, category: 'health' },
+  { id: 'hc-degraded', resource: 'hc', name: 'Degraded', healthy: false, category: 'health' },
+  { id: 'hc-progressing', resource: 'hc', name: 'Progressing', healthy: false, category: 'lifecycle' },
+  { id: 'hc-infrastructureReady', resource: 'hc', name: 'InfrastructureReady', healthy: true, category: 'infrastructure' },
+  { id: 'hc-kubeAPIServerAvailable', resource: 'hc', name: 'KubeAPIServerAvailable', healthy: true, category: 'infrastructure' },
+  { id: 'hc-etcdAvailable', resource: 'hc', name: 'EtcdAvailable', healthy: true, category: 'infrastructure' },
+  { id: 'hc-externalDNSReachable', resource: 'hc', name: 'ExternalDNSReachable', healthy: true, category: 'infrastructure' },
+  { id: 'hc-validHostedControlPlaneConfiguration', resource: 'hc', name: 'ValidHostedControlPlaneConfiguration', healthy: true, category: 'validation' },
+  { id: 'hc-validReleaseInfo', resource: 'hc', name: 'ValidReleaseInfo', healthy: true, category: 'validation' },
+  { id: 'hc-validIDPConfiguration', resource: 'hc', name: 'ValidIDPConfiguration', healthy: true, category: 'validation' },
+  { id: 'hc-dataPlaneConnectionAvailable', resource: 'hc', name: 'DataPlaneConnectionAvailable', healthy: true, category: 'dataplane' },
+  { id: 'hc-controlPlaneConnectionAvailable', resource: 'hc', name: 'ControlPlaneConnectionAvailable', healthy: true, category: 'dataplane' },
+  { id: 'hc-etcdBackupSucceeded', resource: 'hc', name: 'EtcdBackupSucceeded', healthy: true, category: 'infrastructure' },
+  { id: 'hc-configOperatorReconciliationSucceeded', resource: 'hc', name: 'ConfigOperatorReconciliationSucceeded', healthy: true, category: 'lifecycle' },
+  { id: 'hc-hostedClusterRestoredFromBackup', resource: 'hc', name: 'HostedClusterRestoredFromBackup', healthy: true, category: 'lifecycle' },
+  { id: 'hc-validConfiguration', resource: 'hc', name: 'ValidConfiguration', healthy: true, category: 'validation' },
+  { id: 'hc-supportedHostedCluster', resource: 'hc', name: 'SupportedHostedCluster', healthy: true, category: 'validation' },
+  { id: 'hc-validProxyConfiguration', resource: 'hc', name: 'ValidProxyConfiguration', healthy: true, category: 'validation' },
+  { id: 'hc-validReleaseImage', resource: 'hc', name: 'ValidReleaseImage', healthy: true, category: 'validation' },
+  { id: 'hc-validOIDCConfiguration', resource: 'hc', name: 'ValidOIDCConfiguration', healthy: true, category: 'validation', platform: 'AWS' },
+  { id: 'hc-ignitionEndpointAvailable', resource: 'hc', name: 'IgnitionEndpointAvailable', healthy: true, category: 'infrastructure' },
+  { id: 'hc-reconciliationActive', resource: 'hc', name: 'ReconciliationActive', healthy: true, category: 'lifecycle' },
+  { id: 'hc-reconciliationSucceeded', resource: 'hc', name: 'ReconciliationSucceeded', healthy: true, category: 'lifecycle' },
+  { id: 'hc-platformCredentialsFound', resource: 'hc', name: 'PlatformCredentialsFound', healthy: true, category: 'validation' },
+  { id: 'hc-validAWSIdentityProvider', resource: 'hc', name: 'ValidAWSIdentityProvider', healthy: true, category: 'platform', platform: 'AWS' },
+  { id: 'hc-validAWSKMSConfig', resource: 'hc', name: 'ValidAWSKMSConfig', healthy: true, category: 'platform', platform: 'AWS' },
+  { id: 'hc-validAzureKMSConfig', resource: 'hc', name: 'ValidAzureKMSConfig', healthy: true, category: 'platform', platform: 'Azure' },
+  { id: 'hc-awsDefaultSecurityGroupCreated', resource: 'hc', name: 'AWSDefaultSecurityGroupCreated', healthy: true, category: 'platform', platform: 'AWS' },
+  { id: 'hc-validKubeVirtInfraNetworkMTU', resource: 'hc', name: 'ValidKubeVirtInfraNetworkMTU', healthy: true, category: 'platform', platform: 'KubeVirt' },
+  { id: 'hc-kubeVirtNodesLiveMigratable', resource: 'hc', name: 'KubeVirtNodesLiveMigratable', healthy: true, category: 'platform', platform: 'KubeVirt' },
+  { id: 'hc-etcdDataEncryptionUpToDate', resource: 'hc', name: 'EtcdDataEncryptionUpToDate', healthy: true, category: 'infrastructure' },
+  { id: 'hc-awsEndpointAvailable', resource: 'hc', name: 'AWSEndpointAvailable', healthy: true, category: 'platform', platform: 'AWS' },
+  { id: 'hc-awsEndpointServiceAvailable', resource: 'hc', name: 'AWSEndpointServiceAvailable', healthy: true, category: 'platform', platform: 'AWS' },
+  { id: 'hc-validGCPCredentials', resource: 'hc', name: 'ValidGCPCredentials', healthy: true, category: 'platform', platform: 'GCP' },
+  { id: 'hc-validGCPWorkloadIdentity', resource: 'hc', name: 'ValidGCPWorkloadIdentity', healthy: true, category: 'platform', platform: 'GCP' },
+  { id: 'hc-clusterSizeComputed', resource: 'hc', name: 'ClusterSizeComputed', healthy: true, category: 'lifecycle' },
+  { id: 'hc-autoNodeEnabled', resource: 'hc', name: 'AutoNodeEnabled', healthy: true, category: 'lifecycle' },
+  { id: 'hc-validKubeVirtInfraNetworkPolicyRBAC', resource: 'hc', name: 'ValidKubeVirtInfraNetworkPolicyRBAC', healthy: true, category: 'platform', platform: 'KubeVirt' },
+
+  // ── NodePool (np) — column 3, surface ──
+  { id: 'np-ready', resource: 'np', name: 'Ready', healthy: true, category: 'health' },
+  { id: 'np-allMachinesReady', resource: 'np', name: 'AllMachinesReady', healthy: true, category: 'health' },
+  { id: 'np-allNodesHealthy', resource: 'np', name: 'AllNodesHealthy', healthy: true, category: 'health' },
+  { id: 'np-validReleaseImage', resource: 'np', name: 'ValidReleaseImage', healthy: true, category: 'validation' },
+  { id: 'np-validMachineConfig', resource: 'np', name: 'ValidMachineConfig', healthy: true, category: 'validation' },
+  { id: 'np-validTuningConfig', resource: 'np', name: 'ValidTuningConfig', healthy: true, category: 'validation' },
+  { id: 'np-validPlatformConfig', resource: 'np', name: 'ValidPlatformConfig', healthy: true, category: 'validation' },
+  { id: 'np-updateManagementEnabled', resource: 'np', name: 'UpdateManagementEnabled', healthy: true, category: 'lifecycle' },
+  { id: 'np-autoscalingEnabled', resource: 'np', name: 'AutoscalingEnabled', healthy: true, category: 'lifecycle' },
+  { id: 'np-reconciliationActive', resource: 'np', name: 'ReconciliationActive', healthy: true, category: 'lifecycle' },
+  { id: 'np-validGeneratedPayload', resource: 'np', name: 'ValidGeneratedPayload', healthy: true, category: 'validation' },
+  { id: 'np-reachedIgnitionEndpoint', resource: 'np', name: 'ReachedIgnitionEndpoint', healthy: true, category: 'infrastructure' },
+  { id: 'np-updatingVersion', resource: 'np', name: 'UpdatingVersion', healthy: false, category: 'lifecycle' },
+  { id: 'np-updatingConfig', resource: 'np', name: 'UpdatingConfig', healthy: false, category: 'lifecycle' },
+  { id: 'np-updatingPlatformMachineTemplate', resource: 'np', name: 'UpdatingPlatformMachineTemplate', healthy: false, category: 'lifecycle' },
+  { id: 'np-supportedVersionSkew', resource: 'np', name: 'SupportedVersionSkew', healthy: true, category: 'validation' },
+  { id: 'np-validArchPlatform', resource: 'np', name: 'ValidArchPlatform', healthy: true, category: 'validation' },
+  { id: 'np-autorepairEnabled', resource: 'np', name: 'AutorepairEnabled', healthy: true, category: 'lifecycle' },
+  { id: 'np-validPlatformImage', resource: 'np', name: 'ValidPlatformImage', healthy: true, category: 'validation', platform: 'AWS' },
+  { id: 'np-awsSecurityGroupAvailable', resource: 'np', name: 'AWSSecurityGroupAvailable', healthy: true, category: 'platform', platform: 'AWS' },
+  { id: 'np-kubeVirtNodesLiveMigratable', resource: 'np', name: 'KubeVirtNodesLiveMigratable', healthy: true, category: 'platform', platform: 'KubeVirt' },
+  { id: 'np-perfProfileAvailable', resource: 'np', name: 'perf.operator/Available', healthy: true, category: 'perfprofile' },
+  { id: 'np-perfProfileProgressing', resource: 'np', name: 'perf.operator/Progressing', healthy: false, category: 'perfprofile' },
+  { id: 'np-perfProfileUpgradeable', resource: 'np', name: 'perf.operator/Upgradeable', healthy: true, category: 'perfprofile' },
+  { id: 'np-perfProfileDegraded', resource: 'np', name: 'perf.operator/Degraded', healthy: false, category: 'perfprofile' },
+];
+
+const EDGES = [
+  // ── CO -> CV (CVO internal) ──
+  // CO Available feeds into payload sync success → CV Available ("has payload ever completed")
+  { source: 'co-available', target: 'cv-available', type: 'AGGREGATE', controller: 'CVO (via payload sync)' },
+  // CO Progressing feeds into sync state → CV Progressing ("is CVO still working toward desired version")
+  { source: 'co-progressing', target: 'cv-progressing', type: 'AGGREGATE', controller: 'CVO (via payload sync)' },
+  // CO Degraded → payload sync error after 40min → CV Failing
+  { source: 'co-degraded', target: 'cv-failing', type: 'AGGREGATE', controller: 'CVO (via payload sync, 40min timeout)' },
+  // CO Upgradeable → directly aggregated: ANY CO Upgradeable=False blocks CV Upgradeable
+  { source: 'co-upgradeable', target: 'cv-upgradeable', type: 'AGGREGATE', controller: 'CVO (direct aggregation)' },
+
+  // ── CV internal: Upgradeable is composite of 5 checks ──
+  // CO Upgradeable is one input (above). The other 4 are CVO-internal checks:
+  // no spec.overrides, admin acks, no deletes in progress, no upgrade in progress.
+  // These are modeled as a single "CV Upgradeable" condition since the sub-checks
+  // are CVO-internal and don't appear as separate CO/CV conditions.
+
+  // ── CV internal: Failing depends on Available (CO not Available → immediate fail) ──
+  { source: 'co-available', target: 'cv-failing', type: 'AGGREGATE', controller: 'CVO (CO NotAvailable → immediate fail)' },
+
+  // ── CV -> HCP (HCCO hcpstatus controller) ──
+  { source: 'cv-failing', target: 'hcp-clusterVersionFailing', type: 'DIRECT_COPY', controller: 'HCCO hcpstatus' },
+  { source: 'cv-available', target: 'hcp-clusterVersionAvailable', type: 'DIRECT_COPY', controller: 'HCCO hcpstatus' },
+  { source: 'cv-progressing', target: 'hcp-clusterVersionProgressing', type: 'DIRECT_COPY', controller: 'HCCO hcpstatus' },
+  { source: 'cv-upgradeable', target: 'hcp-clusterVersionUpgradeable', type: 'DEFAULT_TRUE_IF_ABSENT', controller: 'HCCO hcpstatus' },
+  { source: 'cv-releaseAccepted', target: 'hcp-clusterVersionReleaseAccepted', type: 'DIRECT_COPY', controller: 'HCCO hcpstatus' },
+  { source: 'cv-retrievedUpdates', target: 'hcp-clusterVersionRetrievedUpdates', type: 'DIRECT_COPY', controller: 'HCCO hcpstatus' },
+
+  // ── HCP -> HC (batch propagation, HC controller) ──
+  { source: 'hcp-etcdAvailable', target: 'hc-etcdAvailable', type: 'DIRECT_COPY', controller: 'HC controller' },
+  { source: 'hcp-kubeAPIServerAvailable', target: 'hc-kubeAPIServerAvailable', type: 'DIRECT_COPY', controller: 'HC controller' },
+  { source: 'hcp-infrastructureReady', target: 'hc-infrastructureReady', type: 'DIRECT_COPY', controller: 'HC controller' },
+  { source: 'hcp-externalDNSReachable', target: 'hc-externalDNSReachable', type: 'DIRECT_COPY', controller: 'HC controller' },
+  { source: 'hcp-validHostedControlPlaneConfiguration', target: 'hc-validHostedControlPlaneConfiguration', type: 'DIRECT_COPY', controller: 'HC controller' },
+  { source: 'hcp-validReleaseInfo', target: 'hc-validReleaseInfo', type: 'DIRECT_COPY', controller: 'HC controller' },
+  { source: 'hcp-validIDPConfiguration', target: 'hc-validIDPConfiguration', type: 'DIRECT_COPY', controller: 'HC controller' },
+  { source: 'hcp-hostedClusterRestoredFromBackup', target: 'hc-hostedClusterRestoredFromBackup', type: 'DIRECT_COPY', controller: 'HC controller' },
+  { source: 'hcp-dataPlaneConnectionAvailable', target: 'hc-dataPlaneConnectionAvailable', type: 'DIRECT_COPY', controller: 'HC controller' },
+  { source: 'hcp-controlPlaneConnectionAvailable', target: 'hc-controlPlaneConnectionAvailable', type: 'DIRECT_COPY', controller: 'HC controller' },
+  { source: 'hcp-etcdBackupSucceeded', target: 'hc-etcdBackupSucceeded', type: 'DIRECT_COPY', controller: 'HC controller' },
+  { source: 'hcp-configOperatorReconciliationSucceeded', target: 'hc-configOperatorReconciliationSucceeded', type: 'DIRECT_COPY', controller: 'HC controller' },
+
+  // ── HCP -> HC (CVO conditions with transformations) ──
+  { source: 'hcp-clusterVersionFailing', target: 'hc-clusterVersionSucceeding', type: 'INVERT', controller: 'HC controller' },
+  { source: 'hcp-clusterVersionProgressing', target: 'hc-clusterVersionProgressing', type: 'DIRECT_COPY', controller: 'HC controller' },
+  { source: 'hcp-clusterVersionReleaseAccepted', target: 'hc-clusterVersionReleaseAccepted', type: 'DIRECT_COPY', controller: 'HC controller' },
+  { source: 'hcp-clusterVersionRetrievedUpdates', target: 'hc-clusterVersionRetrievedUpdates', type: 'REMOVE_WHEN_UNKNOWN', controller: 'HC controller' },
+  { source: 'hcp-clusterVersionUpgradeable', target: 'hc-clusterVersionUpgradeable', type: 'DIRECT_COPY', controller: 'HC controller' },
+  { source: 'hcp-clusterVersionAvailable', target: 'hc-clusterVersionAvailable', type: 'DIRECT_COPY', controller: 'HC controller' },
+
+  // ── HCP internal: Available is a composite ──
+  { source: 'hcp-infrastructureReady', target: 'hcp-available', type: 'AGGREGATE', controller: 'CPO', sameColumn: true },
+  { source: 'hcp-etcdAvailable', target: 'hcp-available', type: 'AGGREGATE', controller: 'CPO', sameColumn: true },
+  { source: 'hcp-kubeAPIServerAvailable', target: 'hcp-available', type: 'AGGREGATE', controller: 'CPO', sameColumn: true },
+
+  // ── HCP -> HC (special cases) ──
+  { source: 'hcp-degraded', target: 'hc-degraded', type: 'DIRECT_COPY', controller: 'HC controller', label: 'RENAME' },
+  { source: 'hcp-available', target: 'hc-available', type: 'DIRECT_COPY', controller: 'HC controller', label: 'RECOMPUTE' },
+  { source: 'hcp-validAWSIdentityProvider', target: 'hc-validAWSIdentityProvider', type: 'DIRECT_COPY', controller: 'HC controller', platform: 'AWS' },
+  { source: 'hcp-validAWSKMSConfig', target: 'hc-validAWSKMSConfig', type: 'DIRECT_COPY', controller: 'HC controller', platform: 'AWS' },
+  { source: 'hcp-validAzureKMSConfig', target: 'hc-validAzureKMSConfig', type: 'DIRECT_COPY', controller: 'HC controller', platform: 'Azure' },
+  { source: 'hcp-awsDefaultSecurityGroupCreated', target: 'hc-awsDefaultSecurityGroupCreated', type: 'DIRECT_COPY', controller: 'HC controller', platform: 'AWS' },
+  { source: 'hcp-validKubeVirtInfraNetworkMTU', target: 'hc-validKubeVirtInfraNetworkMTU', type: 'DIRECT_COPY', controller: 'HC controller', platform: 'KubeVirt' },
+  { source: 'hcp-etcdDataEncryptionUpToDate', target: 'hc-etcdDataEncryptionUpToDate', type: 'DIRECT_COPY', controller: 'HC controller' },
+
+  // ── AWSMachine internal composites ──
+  { source: 'awsmachine-instanceReady', target: 'awsmachine-ready', type: 'AGGREGATE', controller: 'AWSMachine controller', platform: 'AWS', sameColumn: true },
+  { source: 'awsmachine-securityGroupsReady', target: 'awsmachine-ready', type: 'AGGREGATE', controller: 'AWSMachine controller', platform: 'AWS', sameColumn: true },
+  { source: 'awsmachine-elbAttached', target: 'awsmachine-ready', type: 'AGGREGATE', controller: 'AWSMachine controller (CP only)', platform: 'AWS', sameColumn: true },
+
+  // ── KubevirtMachine internal composites ──
+  { source: 'kvmachine-vmProvisioned', target: 'kvmachine-ready', type: 'AGGREGATE', controller: 'KubevirtMachine controller', platform: 'KubeVirt', sameColumn: true },
+  { source: 'kvmachine-bootstrapExecSucceeded', target: 'kvmachine-ready', type: 'AGGREGATE', controller: 'KubevirtMachine controller', platform: 'KubeVirt', sameColumn: true },
+
+  // ── AzureMachine internal ──
+  { source: 'azuremachine-vmRunning', target: 'azuremachine-ready', type: 'AGGREGATE', controller: 'AzureMachine controller', platform: 'Azure', sameColumn: true },
+  { source: 'azuremachine-vmIdentitiesReady', target: 'azuremachine-ready', type: 'AGGREGATE', controller: 'AzureMachine controller', platform: 'Azure', sameColumn: true },
+  { source: 'azuremachine-bootstrapSucceeded', target: 'azuremachine-ready', type: 'AGGREGATE', controller: 'AzureMachine controller', platform: 'Azure', sameColumn: true },
+
+  // ── OpenStackMachine internal ──
+  { source: 'openstackmachine-instanceReady', target: 'openstackmachine-ready', type: 'AGGREGATE', controller: 'OpenStackMachine controller', platform: 'OpenStack', sameColumn: true },
+
+  // ── IBMPowerVSMachine internal ──
+  { source: 'powervsmachine-instanceReady', target: 'powervsmachine-ready', type: 'AGGREGATE', controller: 'IBMPowerVSMachine controller', platform: 'PowerVS', sameColumn: true },
+  { source: 'powervsmachine-imageReady', target: 'powervsmachine-ready', type: 'AGGREGATE', controller: 'IBMPowerVSMachine controller', platform: 'PowerVS', sameColumn: true },
+
+  // ── AgentMachine internal ──
+  { source: 'agentmachine-agentReserved', target: 'agentmachine-ready', type: 'AGGREGATE', controller: 'AgentMachine controller', platform: 'Agent', sameColumn: true },
+  { source: 'agentmachine-agentSpecSynced', target: 'agentmachine-ready', type: 'AGGREGATE', controller: 'AgentMachine controller', platform: 'Agent', sameColumn: true },
+  { source: 'agentmachine-agentValidated', target: 'agentmachine-ready', type: 'AGGREGATE', controller: 'AgentMachine controller', platform: 'Agent', sameColumn: true },
+  { source: 'agentmachine-agentRequirementsMet', target: 'agentmachine-ready', type: 'AGGREGATE', controller: 'AgentMachine controller', platform: 'Agent', sameColumn: true },
+  { source: 'agentmachine-installed', target: 'agentmachine-ready', type: 'AGGREGATE', controller: 'AgentMachine controller', platform: 'Agent', sameColumn: true },
+
+  // ── InfrastructureMachine -> Machine InfrastructureReady (mirror) ──
+  { source: 'awsmachine-ready', target: 'machine-infraReady-1', type: 'DIRECT_COPY', controller: 'CAPI Machine controller (mirror)', platform: 'AWS', sameColumn: true },
+  { source: 'kvmachine-ready', target: 'machine-infraReady-1', type: 'DIRECT_COPY', controller: 'CAPI Machine controller (mirror)', platform: 'KubeVirt', sameColumn: true },
+  { source: 'gcpmachine-ready', target: 'machine-infraReady-1', type: 'DIRECT_COPY', controller: 'CAPI Machine controller (mirror)', platform: 'GCP', sameColumn: true },
+  { source: 'azuremachine-ready', target: 'machine-infraReady-1', type: 'DIRECT_COPY', controller: 'CAPI Machine controller (mirror)', platform: 'Azure', sameColumn: true },
+  { source: 'openstackmachine-ready', target: 'machine-infraReady-1', type: 'DIRECT_COPY', controller: 'CAPI Machine controller (mirror)', platform: 'OpenStack', sameColumn: true },
+  { source: 'powervsmachine-ready', target: 'machine-infraReady-1', type: 'DIRECT_COPY', controller: 'CAPI Machine controller (mirror)', platform: 'PowerVS', sameColumn: true },
+  { source: 'agentmachine-ready', target: 'machine-infraReady-1', type: 'DIRECT_COPY', controller: 'CAPI Machine controller (mirror)', platform: 'Agent', sameColumn: true },
+
+  // ── Machine internal: InfrastructureReady + BootstrapReady -> Machine Ready ──
+  { source: 'machine-infraReady-1', target: 'machine-ready-1', type: 'AGGREGATE', controller: 'CAPI Machine controller', sameColumn: true },
+  { source: 'machine-bootstrapReady-1', target: 'machine-ready-1', type: 'AGGREGATE', controller: 'CAPI Machine controller', sameColumn: true },
+  { source: 'machine-infraReady-2', target: 'machine-ready-2', type: 'AGGREGATE', controller: 'CAPI Machine controller', sameColumn: true },
+  { source: 'machine-bootstrapReady-2', target: 'machine-ready-2', type: 'AGGREGATE', controller: 'CAPI Machine controller', sameColumn: true },
+  { source: 'machine-infraReady-3', target: 'machine-ready-3', type: 'AGGREGATE', controller: 'CAPI Machine controller', sameColumn: true },
+  { source: 'machine-bootstrapReady-3', target: 'machine-ready-3', type: 'AGGREGATE', controller: 'CAPI Machine controller', sameColumn: true },
+
+  // ── KubevirtMachine VMLiveMigratable -> Machine VMLiveMigratable ──
+  { source: 'kvmachine-vmLiveMigratable', target: 'machine-vmLiveMigratable-1', type: 'DIRECT_COPY', controller: 'CAPI Machine controller', platform: 'KubeVirt', sameColumn: true },
+
+  // ── Machine Ready -> MachineSet MachinesReady (aggregate) ──
+  { source: 'machine-ready-1', target: 'ms-machinesReady', type: 'AGGREGATE', controller: 'CAPI MachineSet controller' },
+  { source: 'machine-ready-2', target: 'ms-machinesReady', type: 'AGGREGATE', controller: 'CAPI MachineSet controller' },
+  { source: 'machine-ready-3', target: 'ms-machinesReady', type: 'AGGREGATE', controller: 'CAPI MachineSet controller' },
+
+  // ── Machine NodeHealthy -> NodePool AllNodesHealthy (direct) ──
+  { source: 'machine-nodeHealthy-1', target: 'np-allNodesHealthy', type: 'AGGREGATE', controller: 'NP controller' },
+  { source: 'machine-nodeHealthy-2', target: 'np-allNodesHealthy', type: 'AGGREGATE', controller: 'NP controller' },
+  { source: 'machine-nodeHealthy-3', target: 'np-allNodesHealthy', type: 'AGGREGATE', controller: 'NP controller' },
+
+  // ── Machine VMLiveMigratable -> NodePool KubeVirtNodesLiveMigratable (direct) ──
+  { source: 'machine-vmLiveMigratable-1', target: 'np-kubeVirtNodesLiveMigratable', type: 'AGGREGATE', controller: 'NP controller', platform: 'KubeVirt' },
+  { source: 'machine-vmLiveMigratable-2', target: 'np-kubeVirtNodesLiveMigratable', type: 'AGGREGATE', controller: 'NP controller', platform: 'KubeVirt' },
+  { source: 'machine-vmLiveMigratable-3', target: 'np-kubeVirtNodesLiveMigratable', type: 'AGGREGATE', controller: 'NP controller', platform: 'KubeVirt' },
+
+  // ── MachineSet internal composites ──
+  { source: 'ms-machinesReady', target: 'ms-ready', type: 'AGGREGATE', controller: 'CAPI MachineSet controller', sameColumn: true },
+  { source: 'ms-machinesCreated', target: 'ms-ready', type: 'AGGREGATE', controller: 'CAPI MachineSet controller', sameColumn: true },
+  { source: 'ms-resized', target: 'ms-ready', type: 'AGGREGATE', controller: 'CAPI MachineSet controller', sameColumn: true },
+
+  // ── MachineSet Ready -> MachineDeployment MachineSetReady (mirror, informational) ──
+  { source: 'ms-ready', target: 'md-machineSetReady', type: 'DIRECT_COPY', controller: 'CAPI MD controller (mirror, informational)', sameColumn: true },
+
+  // ── MachineDeployment Available -> MachineDeployment Ready ──
+  { source: 'md-available', target: 'md-ready', type: 'AGGREGATE', controller: 'CAPI MD controller', sameColumn: true },
+
+  // ── MachineDeployment Ready -> NodePool Ready ──
+  { source: 'md-ready', target: 'np-ready', type: 'DIRECT_COPY', controller: 'NP controller' },
+
+  // ── MachineSet Ready -> NodePool Ready (InPlace upgrade) ──
+  { source: 'ms-ready', target: 'np-ready', type: 'DIRECT_COPY', controller: 'NP controller (InPlace upgrade)' },
+
+  // ── PerformanceProfile -> NodePool ──
+  { source: 'perfprofile-available', target: 'np-perfProfileAvailable', type: 'DIRECT_COPY', controller: 'NP controller' },
+  { source: 'perfprofile-progressing', target: 'np-perfProfileProgressing', type: 'DIRECT_COPY', controller: 'NP controller' },
+  { source: 'perfprofile-upgradeable', target: 'np-perfProfileUpgradeable', type: 'DIRECT_COPY', controller: 'NP controller' },
+  { source: 'perfprofile-degraded', target: 'np-perfProfileDegraded', type: 'DIRECT_COPY', controller: 'NP controller' },
+
+  // ── NodePool internal composites ──
+  // AutorepairEnabled requires ReachedIgnitionEndpoint=True (MHC only created when ignition reached)
+  { source: 'np-reachedIgnitionEndpoint', target: 'np-autorepairEnabled', type: 'AGGREGATE', controller: 'NP controller', sameColumn: true },
+  // Ready can be overridden to False when AutoRepair + MHC RemediationAllowed=False
+  { source: 'np-autorepairEnabled', target: 'np-ready', type: 'AGGREGATE', controller: 'NP controller (MHC override)', sameColumn: true },
+
+  // ── NodePool -> HostedCluster (within col 3) ──
+  { source: 'np-kubeVirtNodesLiveMigratable', target: 'hc-kubeVirtNodesLiveMigratable', type: 'AGGREGATE', controller: 'HC controller', platform: 'KubeVirt', sameColumn: true },
+];
+
+/* ================================================================
+   STATE
+   ================================================================ */
+const state = {
+  selectedCondition: null,
+  hoveredCondition: null,
+  conditionStates: {},
+  platformFilter: 'All',
+  categoryFilter: 'All',
+  darkMode: true,
+};
+
+// Build a lookup map for conditions
+const conditionMap = {};
+CONDITIONS.forEach(c => { conditionMap[c.id] = c; });
+
+// Build a lookup for resources
+const resourceMap = {};
+RESOURCES.forEach(r => { resourceMap[r.id] = r; });
+
+// Initialize all condition states to their healthy default
+function initConditionStates() {
+  CONDITIONS.forEach(c => {
+    state.conditionStates[c.id] = c.healthy ? 'true' : 'false';
+  });
+}
+initConditionStates();
+
+/* ================================================================
+   RENDERING - BUILD THE COLUMN CONTENT
+   ================================================================ */
+function renderColumns() {
+  for (let col = 0; col < 4; col++) {
+    const colEl = document.getElementById('col-' + col);
+    // Remove previous resource groups (keep column-header)
+    colEl.querySelectorAll('.resource-group').forEach(g => g.remove());
+
+    // Get resources for this column, ordered by chain (control first, then data)
+    const colResources = RESOURCES
+      .filter(r => r.column === col)
+      .sort((a, b) => (a.chain === 'control' ? 0 : 1) - (b.chain === 'control' ? 0 : 1));
+
+    colResources.forEach(res => {
+      const group = document.createElement('div');
+      group.className = 'resource-group';
+      group.dataset.resource = res.id;
+
+      // Resource header
+      const header = document.createElement('div');
+      header.className = 'resource-header';
+      header.innerHTML = '<span class="resource-name">' + res.name + '</span>'
+        + '<span class="resource-shortname">' + res.shortName + '</span>';
+      group.appendChild(header);
+
+      // Conditions for this resource
+      const resConds = CONDITIONS.filter(c => c.resource === res.id);
+      resConds.forEach(cond => {
+        const bar = document.createElement('div');
+        bar.className = 'condition-bar';
+        bar.id = 'cbar-' + cond.id;
+        bar.dataset.conditionId = cond.id;
+
+        const statusClass = getStatusClass(cond.id);
+        const stVal = state.conditionStates[cond.id];
+        const displayVal = stVal === 'true' ? 'True' : stVal === 'false' ? 'False' : stVal === 'unknown' ? 'Unknown' : 'Absent';
+        bar.innerHTML =
+          '<div class="status-strip ' + statusClass + '"></div>'
+          + '<span class="condition-name">' + cond.name + '</span>'
+          + (cond.instance ? '<span class="condition-instance">#' + cond.instance + '</span>' : '')
+          + (cond.platform ? '<span class="condition-platform-badge platform-' + cond.platform.toLowerCase() + '">' + cond.platform + '</span>' : '')
+          + '<span class="condition-value">' + displayVal + '</span>';
+
+        // Event listeners
+        bar.addEventListener('mouseenter', () => onConditionHover(cond.id));
+        bar.addEventListener('mouseleave', () => onConditionUnhover());
+        bar.addEventListener('click', (e) => { e.stopPropagation(); onConditionClick(cond.id); });
+        bar.addEventListener('dblclick', (e) => { e.stopPropagation(); onConditionDblClick(cond.id); });
+
+        group.appendChild(bar);
+      });
+
+      colEl.appendChild(group);
+    });
+  }
+}
+
+function getStatusClass(condId) {
+  const st = state.conditionStates[condId];
+  const cond = conditionMap[condId];
+  if (!cond) return 'status-true';
+  if (st === 'unknown') return 'status-unknown';
+  if (st === 'absent') return 'status-absent';
+  const isHealthy = (st === 'true') === cond.healthy;
+  return isHealthy ? 'status-true' : 'status-false';
+}
+
+function getHealthColor(condId) {
+  const st = state.conditionStates[condId];
+  const cond = conditionMap[condId];
+  if (!cond) return 'var(--grey)';
+  if (st === 'unknown') return 'var(--amber)';
+  if (st === 'absent') return 'var(--grey)';
+  // Determine if the current state is the healthy state
+  const isHealthy = (st === 'true') === cond.healthy;
+  return isHealthy ? 'var(--green)' : 'var(--red)';
+}
+
+function updateConditionBarVisual(condId) {
+  const bar = document.getElementById('cbar-' + condId);
+  if (!bar) return;
+  const strip = bar.querySelector('.status-strip');
+  if (!strip) return;
+  strip.className = 'status-strip';
+  const st = state.conditionStates[condId];
+  const cond = conditionMap[condId];
+  if (st === 'unknown') {
+    strip.classList.add('status-unknown');
+  } else if (st === 'absent') {
+    strip.classList.add('status-absent');
+  } else {
+    const isHealthy = (st === 'true') === cond.healthy;
+    strip.classList.add(isHealthy ? 'status-true' : 'status-false');
+  }
+  const valEl = bar.querySelector('.condition-value');
+  if (valEl) {
+    valEl.textContent = st === 'true' ? 'True' : st === 'false' ? 'False' : st === 'unknown' ? 'Unknown' : 'Absent';
+  }
+}
+
+/* ================================================================
+   FILTERS
+   ================================================================ */
+function applyFilters() {
+  const pf = state.platformFilter;
+  const cf = state.categoryFilter;
+
+  CONDITIONS.forEach(cond => {
+    const bar = document.getElementById('cbar-' + cond.id);
+    if (!bar) return;
+
+    let visible = true;
+
+    // Platform filter
+    if (pf !== 'All') {
+      if (pf === 'Core') {
+        if (cond.platform) visible = false;
+      } else {
+        if (cond.platform && cond.platform !== pf) visible = false;
+      }
+    }
+
+    // Category filter
+    if (cf !== 'All') {
+      if (cond.category !== cf) visible = false;
+    }
+
+    if (visible) {
+      bar.classList.remove('hidden-by-filter');
+    } else {
+      bar.classList.add('hidden-by-filter');
+    }
+  });
+
+  // Hide empty resource groups
+  document.querySelectorAll('.resource-group').forEach(group => {
+    const visibleBars = group.querySelectorAll('.condition-bar:not(.hidden-by-filter)');
+    group.style.display = visibleBars.length === 0 ? 'none' : '';
+  });
+
+  drawLines();
+}
+
+/* ================================================================
+   D3 LINE DRAWING
+   ================================================================ */
+const svgEl = d3.select('#lines-svg');
+let lineGroup, decoratorGroup;
+
+function initSvg() {
+  svgEl.selectAll('*').remove();
+  lineGroup = svgEl.append('g').attr('class', 'lines-group');
+  decoratorGroup = svgEl.append('g').attr('class', 'decorators-group');
+}
+
+function getBarPosition(condId, side) {
+  const bar = document.getElementById('cbar-' + condId);
+  if (!bar || bar.classList.contains('hidden-by-filter')) return null;
+  const mainRect = document.getElementById('main-container').getBoundingClientRect();
+  const barRect = bar.getBoundingClientRect();
+  const y = barRect.top + barRect.height / 2 - mainRect.top;
+  if (side === 'right') {
+    return { x: barRect.right - mainRect.left, y };
+  }
+  return { x: barRect.left - mainRect.left, y };
+}
+
+function buildBezierPath(src, tgt, sameCol) {
+  if (!src || !tgt) return null;
+  if (sameCol) {
+    // Within same column: curve left
+    const offset = -50;
+    return 'M ' + src.x + ',' + src.y
+      + ' C ' + (src.x + offset) + ',' + src.y
+      + ' ' + (tgt.x + offset) + ',' + tgt.y
+      + ' ' + tgt.x + ',' + tgt.y;
+  }
+  const dx = tgt.x - src.x;
+  return 'M ' + src.x + ',' + src.y
+    + ' C ' + (src.x + dx * 0.4) + ',' + src.y
+    + ' ' + (tgt.x - dx * 0.4) + ',' + tgt.y
+    + ' ' + tgt.x + ',' + tgt.y;
+}
+
+function edgeLineClass(edge) {
+  let cls = 'edge-line';
+  if (edge.type === 'REMOVE_WHEN_UNKNOWN') cls += ' dashed';
+  if (edge.type === 'DEFAULT_TRUE_IF_ABSENT') cls += ' dotted';
+  return cls;
+}
+
+function getVisibleEdges() {
+  return EDGES.filter(edge => {
+    const srcBar = document.getElementById('cbar-' + edge.source);
+    const tgtBar = document.getElementById('cbar-' + edge.target);
+    if (!srcBar || !tgtBar) return false;
+    if (srcBar.classList.contains('hidden-by-filter') || tgtBar.classList.contains('hidden-by-filter')) return false;
+    return true;
+  });
+}
+
+function edgesForCondition(condId) {
+  return EDGES.filter(e => e.source === condId || e.target === condId);
+}
+
+function connectedConditions(condId) {
+  const connected = new Set();
+  const visited = new Set();
+  const queue = [condId];
+  while (queue.length > 0) {
+    const current = queue.shift();
+    if (visited.has(current)) continue;
+    visited.add(current);
+    connected.add(current);
+    EDGES.forEach(e => {
+      if (e.source === current && !visited.has(e.target)) {
+        connected.add(e.target);
+        queue.push(e.target);
+      }
+      if (e.target === current && !visited.has(e.source)) {
+        connected.add(e.source);
+        queue.push(e.source);
+      }
+    });
+  }
+  return connected;
+}
+
+function drawLines() {
+  if (!lineGroup) initSvg();
+  lineGroup.selectAll('*').remove();
+  decoratorGroup.selectAll('*').remove();
+
+  const visibleEdges = getVisibleEdges();
+  const selected = state.selectedCondition;
+  const hovered = state.hoveredCondition;
+
+  // Determine which conditions are "active" (connected to selected/hovered)
+  let activeConditions = null;
+  let activeEdges = null;
+  if (selected) {
+    activeConditions = connectedConditions(selected);
+    activeEdges = new Set();
+    EDGES.forEach(e => {
+      if (activeConditions.has(e.source) && activeConditions.has(e.target)) {
+        activeEdges.add(e);
+      }
+    });
+  } else if (hovered) {
+    activeConditions = connectedConditions(hovered);
+    activeEdges = new Set();
+    EDGES.forEach(e => {
+      if (activeConditions.has(e.source) && activeConditions.has(e.target)) {
+        activeEdges.add(e);
+      }
+    });
+  }
+
+  // No lines when nothing is selected or hovered
+  const showNone = !selected && !hovered;
+
+  visibleEdges.forEach(edge => {
+    const sameCol = edge.sameColumn;
+    const srcPos = getBarPosition(edge.source, sameCol ? 'left' : 'right');
+    const tgtPos = getBarPosition(edge.target, 'left');
+    if (!srcPos || !tgtPos) return;
+
+    const pathD = buildBezierPath(srcPos, tgtPos, sameCol);
+    if (!pathD) return;
+
+    let lineClass = edgeLineClass(edge);
+
+    if (showNone) return;
+
+    if (activeEdges) {
+      if (activeEdges.has(edge)) {
+        lineClass += ' active-line';
+      } else {
+        lineClass += ' dimmed-line';
+      }
+    }
+
+    lineGroup.append('path')
+      .attr('d', pathD)
+      .attr('class', lineClass)
+      .attr('data-source', edge.source)
+      .attr('data-target', edge.target);
+
+    // Decorators
+    const midX = (srcPos.x + tgtPos.x) / 2;
+    const midY = (srcPos.y + tgtPos.y) / 2;
+    let decorator = null;
+    if (edge.type === 'INVERT') decorator = '⇄';
+    if (edge.type === 'AGGREGATE') decorator = '⊕';
+
+    if (decorator) {
+      let decClass = 'edge-decorator';
+      if (activeEdges) {
+        decClass += activeEdges.has(edge) ? ' active-line' : ' dimmed-line';
+      }
+
+      decoratorGroup.append('text')
+        .attr('x', midX)
+        .attr('y', midY)
+        .attr('class', decClass)
+        .text(decorator);
+    }
+  });
+
+  // Apply dim/highlight to condition bars
+  CONDITIONS.forEach(cond => {
+    const bar = document.getElementById('cbar-' + cond.id);
+    if (!bar) return;
+    bar.classList.remove('dimmed', 'highlighted', 'selected');
+    if (selected) {
+      if (cond.id === selected) {
+        bar.classList.add('selected');
+      } else if (activeConditions && activeConditions.has(cond.id)) {
+        bar.classList.add('highlighted');
+      } else {
+        bar.classList.add('dimmed');
+      }
+    } else if (hovered) {
+      if (activeConditions && !activeConditions.has(cond.id)) {
+        bar.classList.add('dimmed');
+      } else if (activeConditions && activeConditions.has(cond.id) && cond.id !== hovered) {
+        bar.classList.add('highlighted');
+      }
+    }
+  });
+}
+
+/* ================================================================
+   INTERACTION HANDLERS
+   ================================================================ */
+function scrollConnectedIntoView(condId) {
+  const connected = connectedConditions(condId);
+  let scrolled = false;
+  connected.forEach(cid => {
+    const bar = document.getElementById('cbar-' + cid);
+    if (!bar) return;
+    const col = bar.closest('.column');
+    if (!col) return;
+    const colRect = col.getBoundingClientRect();
+    const barRect = bar.getBoundingClientRect();
+    if (barRect.top < colRect.top || barRect.bottom > colRect.bottom) {
+      bar.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      scrolled = true;
+    }
+  });
+  if (scrolled) {
+    setTimeout(() => drawLines(), 400);
+  }
+}
+
+function onConditionHover(condId) {
+  if (state.selectedCondition) return; // Don't override selection
+  state.hoveredCondition = condId;
+  showTooltipForCondition(condId);
+  drawLines();
+}
+
+function onConditionUnhover() {
+  if (state.selectedCondition) return;
+  state.hoveredCondition = null;
+  hideTooltip();
+  drawLines();
+}
+
+let clickTimer = null;
+
+function onConditionClick(condId) {
+  clearTimeout(clickTimer);
+  clickTimer = setTimeout(() => {
+    if (state.selectedCondition === condId) {
+      state.selectedCondition = null;
+    } else {
+      state.selectedCondition = condId;
+      scrollConnectedIntoView(condId);
+    }
+    state.hoveredCondition = null;
+    drawLines();
+  }, 250);
+}
+
+function onConditionDblClick(condId) {
+  clearTimeout(clickTimer);
+  cycleConditionState(condId);
+}
+
+function onBackgroundClick() {
+  if (state.selectedCondition) {
+    state.selectedCondition = null;
+    state.hoveredCondition = null;
+    drawLines();
+  }
+}
+
+/* ================================================================
+   TOOLTIP
+   ================================================================ */
+const tooltipEl = document.getElementById('tooltip');
+
+function showTooltipForCondition(condId) {
+  const cond = conditionMap[condId];
+  if (!cond) return;
+  const res = resourceMap[cond.resource];
+  const st = state.conditionStates[condId];
+  const isHealthy = st === 'unknown' ? 'Unknown' : st === 'absent' ? 'Absent' :
+    ((st === 'true') === cond.healthy ? 'Healthy' : 'Unhealthy');
+
+  // Find edges involving this condition
+  const incoming = EDGES.filter(e => e.target === condId);
+  const outgoing = EDGES.filter(e => e.source === condId);
+
+  let html = '<div><strong>' + res.shortName + '.' + cond.name + '</strong></div>';
+  html += '<div class="tt-label">Status: <span class="tt-type">' + st + '</span> (' + isHealthy + ')</div>';
+  if (cond.platform) html += '<div class="tt-label">Platform: ' + cond.platform + '</div>';
+  html += '<div class="tt-label">Category: ' + cond.category + '</div>';
+
+  if (incoming.length > 0) {
+    html += '<div style="margin-top:4px;border-top:1px solid var(--border);padding-top:4px">';
+    html += '<div class="tt-label" style="font-weight:600">From:</div>';
+    incoming.forEach(e => {
+      const srcCond = conditionMap[e.source];
+      const srcRes = srcCond ? resourceMap[srcCond.resource] : null;
+      html += '<div class="tt-label">' + (srcRes ? srcRes.shortName + '.' : '') + (srcCond ? srcCond.name : e.source) + ' <span class="tt-type">' + e.type + '</span></div>';
+    });
+    html += '</div>';
+  }
+  if (outgoing.length > 0) {
+    html += '<div style="margin-top:4px;border-top:1px solid var(--border);padding-top:4px">';
+    html += '<div class="tt-label" style="font-weight:600">To:</div>';
+    outgoing.forEach(e => {
+      const tgtCond = conditionMap[e.target];
+      const tgtRes = tgtCond ? resourceMap[tgtCond.resource] : null;
+      html += '<div class="tt-label">' + (tgtRes ? tgtRes.shortName + '.' : '') + (tgtCond ? tgtCond.name : e.target) + ' <span class="tt-type">' + e.type + '</span></div>';
+    });
+    html += '</div>';
+  }
+
+  tooltipEl.innerHTML = html;
+
+  // Position above the bar, horizontally centered on it
+  const bar = document.getElementById('cbar-' + condId);
+  if (bar) {
+    tooltipEl.style.visibility = 'hidden';
+    tooltipEl.style.display = 'block';
+    const rect = bar.getBoundingClientRect();
+    const ttRect = tooltipEl.getBoundingClientRect();
+    let left = rect.left + (rect.width / 2) - (ttRect.width / 2);
+    let top = rect.top - ttRect.height - 8;
+    // If no room above, show below
+    if (top < 8) top = rect.bottom + 8;
+    // Clamp horizontally
+    if (left < 8) left = 8;
+    if (left + ttRect.width > window.innerWidth - 8) left = window.innerWidth - ttRect.width - 8;
+    tooltipEl.style.left = left + 'px';
+    tooltipEl.style.top = top + 'px';
+    tooltipEl.style.visibility = 'visible';
+  }
+
+  tooltipEl.style.display = 'block';
+}
+
+function hideTooltip() {
+  tooltipEl.style.display = 'none';
+}
+
+/* ================================================================
+   STATUS CYCLING (double-click)
+   ================================================================ */
+function cycleConditionState(condId) {
+  const current = state.conditionStates[condId];
+  const order = ['true', 'false', 'unknown'];
+  const idx = order.indexOf(current);
+  state.conditionStates[condId] = order[(idx + 1) % order.length];
+  updateConditionBarVisual(condId);
+  pulseBar(condId);
+  state.selectedCondition = condId;
+  drawLines();
+  cascadeFrom(condId);
+}
+
+function pulseBar(condId) {
+  const bar = document.getElementById('cbar-' + condId);
+  if (!bar) return;
+  bar.classList.remove('cascade-pulse');
+  void bar.offsetWidth;
+  bar.classList.add('cascade-pulse');
+  setTimeout(() => bar.classList.remove('cascade-pulse'), 3500);
+}
+
+function cascadeFrom(startCondId, visited, depth) {
+  if (!visited) visited = new Set();
+  if (!depth) depth = 0;
+  if (visited.has(startCondId)) return;
+  visited.add(startCondId);
+
+  const outgoing = EDGES.filter(e => e.source === startCondId);
+  const byTarget = {};
+  outgoing.forEach(e => {
+    if (!byTarget[e.target]) byTarget[e.target] = [];
+    byTarget[e.target].push(e);
+  });
+
+  Object.entries(byTarget).forEach(([target, edges]) => {
+    const newState = computeTargetState(target, edges);
+    if (newState !== null && state.conditionStates[target] !== newState) {
+      const delay = 600 * (depth + 1);
+
+      // Animate lines between source and target
+      setTimeout(() => {
+        const lineEls = document.querySelectorAll('[data-source="' + startCondId + '"][data-target="' + target + '"]');
+        lineEls.forEach(el => {
+          el.classList.add('cascading');
+          setTimeout(() => el.classList.remove('cascading'), 3500);
+        });
+      }, delay - 300);
+
+      // Update target state and pulse the bar
+      setTimeout(() => {
+        state.conditionStates[target] = newState;
+        updateConditionBarVisual(target);
+        pulseBar(target);
+        drawLines();
+        cascadeFrom(target, visited, depth + 1);
+      }, delay);
+    }
+  });
+}
+
+function computeTargetState(targetId, edgesToTarget) {
+  if (!edgesToTarget || edgesToTarget.length === 0) return null;
+
+  // For aggregate: check all edges pointing to this target
+  const isAggregate = edgesToTarget.some(e => e.type === 'AGGREGATE');
+  if (isAggregate) {
+    const allEdgesToTarget = EDGES.filter(e => e.target === targetId && e.type === 'AGGREGATE');
+    const allHealthy = allEdgesToTarget.every(e => {
+      const srcCond = conditionMap[e.source];
+      const srcState = state.conditionStates[e.source];
+      if (!srcCond) return true;
+      return (srcState === 'true') === srcCond.healthy;
+    });
+    const anyUnknown = allEdgesToTarget.some(e => state.conditionStates[e.source] === 'unknown');
+    if (anyUnknown) return 'unknown';
+    const targetCond = conditionMap[targetId];
+    // When sources are healthy, target should be in its healthy state and vice versa
+    return (allHealthy === targetCond.healthy) ? 'true' : 'false';
+  }
+
+  // Non-aggregate: use the first edge
+  const edge = edgesToTarget[0];
+  const srcState = state.conditionStates[edge.source];
+
+  switch (edge.type) {
+    case 'DIRECT_COPY':
+      return srcState;
+    case 'INVERT':
+      if (srcState === 'true') return 'false';
+      if (srcState === 'false') return 'true';
+      return srcState;
+    case 'REMOVE_WHEN_UNKNOWN':
+      return srcState === 'unknown' ? 'absent' : srcState;
+    case 'DEFAULT_TRUE_IF_ABSENT':
+      return srcState === 'absent' ? 'true' : srcState;
+    default:
+      return srcState;
+  }
+}
+
+function resetSimulation() {
+  initConditionStates();
+  CONDITIONS.forEach(c => updateConditionBarVisual(c.id));
+  drawLines();
+}
+
+/* ================================================================
+   THEME TOGGLE
+   ================================================================ */
+function toggleTheme() {
+  state.darkMode = !state.darkMode;
+  document.body.classList.toggle('light-mode', !state.darkMode);
+  document.getElementById('theme-toggle').classList.toggle('active', !state.darkMode);
+  document.getElementById('theme-label').textContent = state.darkMode ? 'Light' : 'Dark';
+  // Redraw lines since colors change
+  requestAnimationFrame(() => drawLines());
+}
+
+/* ================================================================
+   EVENT BINDING
+   ================================================================ */
+function bindEvents() {
+  document.getElementById('reset-btn').addEventListener('click', resetSimulation);
+
+  // Theme toggle
+  document.getElementById('theme-toggle').addEventListener('click', toggleTheme);
+
+  // Filters
+  document.getElementById('platform-filter').addEventListener('change', (e) => {
+    state.platformFilter = e.target.value;
+    applyFilters();
+  });
+  document.getElementById('category-filter').addEventListener('change', (e) => {
+    state.categoryFilter = e.target.value;
+    applyFilters();
+  });
+
+  // Background click to deselect
+  document.getElementById('main-container').addEventListener('click', onBackgroundClick);
+
+  // Column scroll -> redraw lines
+  for (let i = 0; i < 4; i++) {
+    document.getElementById('col-' + i).addEventListener('scroll', () => {
+      requestAnimationFrame(() => drawLines());
+    });
+  }
+
+  // Window resize -> redraw lines
+  let resizeTimer;
+  window.addEventListener('resize', () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => drawLines(), 100);
+  });
+}
+
+/* ================================================================
+   INITIALIZATION
+   ================================================================ */
+function init() {
+  renderColumns();
+  initSvg();
+  bindEvents();
+  applyFilters();
+  drawLines();
+}
+
+init();
+</script>
+</body>
+</html>
