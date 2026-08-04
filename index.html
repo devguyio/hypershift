@@ -225,21 +225,25 @@ html, body {
 }
 
 .column {
-  overflow-y: auto;
-  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
   border-right: 1px solid var(--border-subtle);
   position: relative;
-  scroll-padding-top: 40px;
+  min-height: 0;
 }
 .column:last-child { border-right: none; }
 
 .column-header {
-  position: sticky;
-  top: 0;
-  z-index: 5;
+  flex-shrink: 0;
   background: var(--bg);
-  padding: 8px 0 10px 0;
-  margin-bottom: 4px;
+  padding: 8px 14px 10px 14px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.column-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 14px;
 }
 
 .column-depth {
@@ -573,15 +577,19 @@ html, body {
   <div class="columns-wrapper" id="columns-wrapper">
     <div class="column" id="col-0" data-col="0">
       <div class="column-header"><span class="column-depth">Deep</span></div>
+      <div class="column-content" id="col-content-0"></div>
     </div>
     <div class="column" id="col-1" data-col="1">
       <div class="column-header"><span class="column-depth">Mid</span></div>
+      <div class="column-content" id="col-content-1"></div>
     </div>
     <div class="column" id="col-2" data-col="2">
       <div class="column-header"><span class="column-depth">Near</span></div>
+      <div class="column-content" id="col-content-2"></div>
     </div>
     <div class="column" id="col-3" data-col="3">
       <div class="column-header"><span class="column-depth">Surface</span></div>
+      <div class="column-content" id="col-content-3"></div>
     </div>
   </div>
   <svg id="lines-svg"></svg>
@@ -1018,8 +1026,7 @@ initConditionStates();
    ================================================================ */
 function renderColumns() {
   for (let col = 0; col < 4; col++) {
-    const colEl = document.getElementById('col-' + col);
-    // Remove previous resource groups (keep column-header)
+    const colEl = document.getElementById('col-content-' + col);
     colEl.querySelectorAll('.resource-group').forEach(g => g.remove());
 
     // Get resources for this column, ordered by chain (control first, then data)
@@ -1486,16 +1493,12 @@ function cycleConditionState(condId) {
 function scrollBarIntoView(condId) {
   const bar = document.getElementById('cbar-' + condId);
   if (!bar) return;
-  const col = bar.closest('.column');
-  if (!col) return;
-  const header = col.querySelector('.column-header');
-  const headerH = header ? header.getBoundingClientRect().height : 0;
-  const colRect = col.getBoundingClientRect();
+  const content = bar.closest('.column-content');
+  if (!content) return;
+  const contentRect = content.getBoundingClientRect();
   const barRect = bar.getBoundingClientRect();
-  const visibleTop = colRect.top + headerH;
-  if (barRect.top < visibleTop || barRect.bottom > colRect.bottom) {
-    const targetScroll = col.scrollTop + (barRect.top - visibleTop) - 8;
-    col.scrollTo({ top: targetScroll, behavior: 'smooth' });
+  if (barRect.top < contentRect.top || barRect.bottom > contentRect.bottom) {
+    bar.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     setTimeout(() => drawLines(), 400);
   }
 }
@@ -1629,9 +1632,9 @@ function bindEvents() {
   // Background click to deselect
   document.getElementById('main-container').addEventListener('click', onBackgroundClick);
 
-  // Column scroll -> redraw lines
+  // Column content scroll -> redraw lines
   for (let i = 0; i < 4; i++) {
-    document.getElementById('col-' + i).addEventListener('scroll', () => {
+    document.getElementById('col-content-' + i).addEventListener('scroll', () => {
       requestAnimationFrame(() => drawLines());
     });
   }
