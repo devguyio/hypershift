@@ -1488,10 +1488,14 @@ function scrollBarIntoView(condId) {
   if (!bar) return;
   const col = bar.closest('.column');
   if (!col) return;
+  const header = col.querySelector('.column-header');
+  const headerH = header ? header.getBoundingClientRect().height : 0;
   const colRect = col.getBoundingClientRect();
   const barRect = bar.getBoundingClientRect();
-  if (barRect.top < colRect.top || barRect.bottom > colRect.bottom) {
-    bar.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  const visibleTop = colRect.top + headerH;
+  if (barRect.top < visibleTop || barRect.bottom > colRect.bottom) {
+    const targetScroll = col.scrollTop + (barRect.top - visibleTop) - 8;
+    col.scrollTo({ top: targetScroll, behavior: 'smooth' });
     setTimeout(() => drawLines(), 400);
   }
 }
