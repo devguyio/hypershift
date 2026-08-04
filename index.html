@@ -1350,22 +1350,7 @@ function drawLines() {
    ================================================================ */
 function scrollConnectedIntoView(condId) {
   const connected = connectedConditions(condId);
-  let scrolled = false;
-  connected.forEach(cid => {
-    const bar = document.getElementById('cbar-' + cid);
-    if (!bar) return;
-    const col = bar.closest('.column');
-    if (!col) return;
-    const colRect = col.getBoundingClientRect();
-    const barRect = bar.getBoundingClientRect();
-    if (barRect.top < colRect.top || barRect.bottom > colRect.bottom) {
-      bar.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-      scrolled = true;
-    }
-  });
-  if (scrolled) {
-    setTimeout(() => drawLines(), 400);
-  }
+  connected.forEach(cid => scrollBarIntoView(cid));
 }
 
 function onConditionHover(condId) {
@@ -1497,6 +1482,19 @@ function cycleConditionState(condId) {
   cascadeFrom(condId);
 }
 
+function scrollBarIntoView(condId) {
+  const bar = document.getElementById('cbar-' + condId);
+  if (!bar) return;
+  const col = bar.closest('.column');
+  if (!col) return;
+  const colRect = col.getBoundingClientRect();
+  const barRect = bar.getBoundingClientRect();
+  if (barRect.top < colRect.top || barRect.bottom > colRect.bottom) {
+    bar.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    setTimeout(() => drawLines(), 400);
+  }
+}
+
 function pulseBar(condId) {
   const bar = document.getElementById('cbar-' + condId);
   if (!bar) return;
@@ -1533,8 +1531,9 @@ function cascadeFrom(startCondId, visited, depth) {
         });
       }, delay - 300);
 
-      // Update target state and pulse the bar
+      // Update target state, scroll into view, and pulse the bar
       setTimeout(() => {
+        scrollBarIntoView(target);
         state.conditionStates[target] = newState;
         updateConditionBarVisual(target);
         pulseBar(target);
