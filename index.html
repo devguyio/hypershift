@@ -1499,8 +1499,14 @@ function scrollBarIntoView(condId) {
   if (!content) return;
   const contentRect = content.getBoundingClientRect();
   const barRect = bar.getBoundingClientRect();
-  if (barRect.top < contentRect.top || barRect.bottom > contentRect.bottom) {
-    bar.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  const buffer = 80;
+  if (barRect.top < contentRect.top + buffer) {
+    // Bar is above visible area — scroll up with buffer above it
+    content.scrollTo({ top: content.scrollTop + (barRect.top - contentRect.top) - buffer, behavior: 'smooth' });
+    setTimeout(() => drawLines(), 400);
+  } else if (barRect.bottom > contentRect.bottom - buffer) {
+    // Bar is below visible area — scroll down with buffer below it
+    content.scrollTo({ top: content.scrollTop + (barRect.bottom - contentRect.bottom) + buffer, behavior: 'smooth' });
     setTimeout(() => drawLines(), 400);
   }
 }
