@@ -659,9 +659,8 @@ const CONDITIONS = [
   { id: 'machine-nodeHealthy-1', resource: 'machine', name: 'NodeHealthy', instance: '1', healthy: true, category: 'health' },
   { id: 'machine-nodeHealthy-2', resource: 'machine', name: 'NodeHealthy', instance: '2', healthy: true, category: 'health' },
   { id: 'machine-nodeHealthy-3', resource: 'machine', name: 'NodeHealthy', instance: '3', healthy: true, category: 'health' },
-  { id: 'machine-vmLiveMigratable-1', resource: 'machine', name: 'VMLiveMigratable', instance: '1', healthy: true, category: 'platform', platform: 'KubeVirt' },
-  { id: 'machine-vmLiveMigratable-2', resource: 'machine', name: 'VMLiveMigratable', instance: '2', healthy: true, category: 'platform', platform: 'KubeVirt' },
-  { id: 'machine-vmLiveMigratable-3', resource: 'machine', name: 'VMLiveMigratable', instance: '3', healthy: true, category: 'platform', platform: 'KubeVirt' },
+  { id: 'machine-healthCheckSucceeded-1', resource: 'machine', name: 'HealthCheckSucceeded', healthy: true, category: 'health', instance: 1 },
+  { id: 'machine-ownerRemediated-1', resource: 'machine', name: 'OwnerRemediated', healthy: true, category: 'health', instance: 1 },
   { id: 'machine-infraReady-1', resource: 'machine', name: 'InfrastructureReady', healthy: true, category: 'infrastructure', instance: 1 },
   { id: 'machine-infraReady-2', resource: 'machine', name: 'InfrastructureReady', healthy: true, category: 'infrastructure', instance: 2 },
   { id: 'machine-infraReady-3', resource: 'machine', name: 'InfrastructureReady', healthy: true, category: 'infrastructure', instance: 3 },
@@ -691,7 +690,6 @@ const CONDITIONS = [
 
   // ── IBMPowerVSMachine (powervsmachine) — column 0, PowerVS ──
   { id: 'powervsmachine-instanceReady', resource: 'powervsmachine', name: 'InstanceReady', healthy: true, category: 'infrastructure', platform: 'PowerVS' },
-  { id: 'powervsmachine-imageReady', resource: 'powervsmachine', name: 'ImageReady', healthy: true, category: 'infrastructure', platform: 'PowerVS' },
   { id: 'powervsmachine-ready', resource: 'powervsmachine', name: 'Ready', healthy: true, category: 'health', platform: 'PowerVS' },
 
   // ── AgentMachine (agentmachine) — column 0, Agent ──
@@ -746,7 +744,7 @@ const CONDITIONS = [
   { id: 'hcp-kubeAPIServerAvailable', resource: 'hcp', name: 'KubeAPIServerAvailable', healthy: true, category: 'infrastructure' },
   { id: 'hcp-etcdAvailable', resource: 'hcp', name: 'EtcdAvailable', healthy: true, category: 'infrastructure' },
   { id: 'hcp-externalDNSReachable', resource: 'hcp', name: 'ExternalDNSReachable', healthy: true, category: 'infrastructure' },
-  { id: 'hcp-validHostedControlPlaneConfiguration', resource: 'hcp', name: 'ValidConfiguration', healthy: true, category: 'validation' },
+  { id: 'hcp-validHostedControlPlaneConfiguration', resource: 'hcp', name: 'ValidHostedControlPlaneConfiguration', healthy: true, category: 'validation' },
   { id: 'hcp-validReleaseInfo', resource: 'hcp', name: 'ValidReleaseInfo', healthy: true, category: 'validation' },
   { id: 'hcp-validIDPConfiguration', resource: 'hcp', name: 'ValidIDPConfiguration', healthy: true, category: 'validation' },
   { id: 'hcp-dataPlaneConnectionAvailable', resource: 'hcp', name: 'DataPlaneConnectionAvailable', healthy: true, category: 'dataplane' },
@@ -826,13 +824,15 @@ const CONDITIONS = [
   { id: 'np-supportedVersionSkew', resource: 'np', name: 'SupportedVersionSkew', healthy: true, category: 'validation' },
   { id: 'np-validArchPlatform', resource: 'np', name: 'ValidArchPlatform', healthy: true, category: 'validation' },
   { id: 'np-autorepairEnabled', resource: 'np', name: 'AutorepairEnabled', healthy: true, category: 'lifecycle' },
-  { id: 'np-validPlatformImage', resource: 'np', name: 'ValidPlatformImage', healthy: true, category: 'validation', platform: 'AWS' },
+  { id: 'np-validPlatformImage', resource: 'np', name: 'ValidPlatformImage', healthy: true, category: 'validation' },
   { id: 'np-awsSecurityGroupAvailable', resource: 'np', name: 'AWSSecurityGroupAvailable', healthy: true, category: 'platform', platform: 'AWS' },
   { id: 'np-kubeVirtNodesLiveMigratable', resource: 'np', name: 'KubeVirtNodesLiveMigratable', healthy: true, category: 'platform', platform: 'KubeVirt' },
-  { id: 'np-perfProfileAvailable', resource: 'np', name: 'perf.operator/Available', healthy: true, category: 'perfprofile' },
-  { id: 'np-perfProfileProgressing', resource: 'np', name: 'perf.operator/Progressing', healthy: false, category: 'perfprofile' },
-  { id: 'np-perfProfileUpgradeable', resource: 'np', name: 'perf.operator/Upgradeable', healthy: true, category: 'perfprofile' },
-  { id: 'np-perfProfileDegraded', resource: 'np', name: 'perf.operator/Degraded', healthy: false, category: 'perfprofile' },
+  { id: 'np-validMachineTemplate', resource: 'np', name: 'ValidMachineTemplate', healthy: true, category: 'validation', platform: 'KubeVirt' },
+  { id: 'np-clusterNetworkCIDRConflict', resource: 'np', name: 'ClusterNetworkCIDRConflict', healthy: false, category: 'dataplane' },
+  { id: 'np-perfProfileAvailable', resource: 'np', name: 'performance.operator.openshift.io/Available', healthy: true, category: 'perfprofile' },
+  { id: 'np-perfProfileProgressing', resource: 'np', name: 'performance.operator.openshift.io/Progressing', healthy: false, category: 'perfprofile' },
+  { id: 'np-perfProfileUpgradeable', resource: 'np', name: 'performance.operator.openshift.io/Upgradeable', healthy: true, category: 'perfprofile' },
+  { id: 'np-perfProfileDegraded', resource: 'np', name: 'performance.operator.openshift.io/Degraded', healthy: false, category: 'perfprofile' },
 ];
 
 const EDGES = [
@@ -919,7 +919,6 @@ const EDGES = [
 
   // ── IBMPowerVSMachine internal ──
   { source: 'powervsmachine-instanceReady', target: 'powervsmachine-ready', type: 'AGGREGATE', controller: 'IBMPowerVSMachine controller', platform: 'PowerVS', sameColumn: true },
-  { source: 'powervsmachine-imageReady', target: 'powervsmachine-ready', type: 'AGGREGATE', controller: 'IBMPowerVSMachine controller', platform: 'PowerVS', sameColumn: true },
 
   // ── AgentMachine internal ──
   { source: 'agentmachine-agentReserved', target: 'agentmachine-ready', type: 'AGGREGATE', controller: 'AgentMachine controller', platform: 'Agent', sameColumn: true },
@@ -945,8 +944,9 @@ const EDGES = [
   { source: 'machine-infraReady-3', target: 'machine-ready-3', type: 'AGGREGATE', controller: 'CAPI Machine controller', sameColumn: true },
   { source: 'machine-bootstrapReady-3', target: 'machine-ready-3', type: 'AGGREGATE', controller: 'CAPI Machine controller', sameColumn: true },
 
-  // ── KubevirtMachine VMLiveMigratable -> Machine VMLiveMigratable ──
-  { source: 'kvmachine-vmLiveMigratable', target: 'machine-vmLiveMigratable-1', type: 'DIRECT_COPY', controller: 'CAPI Machine controller', platform: 'KubeVirt', sameColumn: true },
+  // ── Machine HealthCheckSucceeded + OwnerRemediated -> Machine Ready ──
+  { source: 'machine-healthCheckSucceeded-1', target: 'machine-ready-1', type: 'AGGREGATE', controller: 'CAPI Machine controller', sameColumn: true },
+  { source: 'machine-ownerRemediated-1', target: 'machine-ready-1', type: 'AGGREGATE', controller: 'CAPI Machine controller', sameColumn: true },
 
   // ── Machine Ready -> MachineSet MachinesReady (aggregate) ──
   { source: 'machine-ready-1', target: 'ms-machinesReady', type: 'AGGREGATE', controller: 'CAPI MachineSet controller' },
@@ -958,10 +958,8 @@ const EDGES = [
   { source: 'machine-nodeHealthy-2', target: 'np-allNodesHealthy', type: 'AGGREGATE', controller: 'NP controller' },
   { source: 'machine-nodeHealthy-3', target: 'np-allNodesHealthy', type: 'AGGREGATE', controller: 'NP controller' },
 
-  // ── Machine VMLiveMigratable -> NodePool KubeVirtNodesLiveMigratable (direct) ──
-  { source: 'machine-vmLiveMigratable-1', target: 'np-kubeVirtNodesLiveMigratable', type: 'AGGREGATE', controller: 'NP controller', platform: 'KubeVirt' },
-  { source: 'machine-vmLiveMigratable-2', target: 'np-kubeVirtNodesLiveMigratable', type: 'AGGREGATE', controller: 'NP controller', platform: 'KubeVirt' },
-  { source: 'machine-vmLiveMigratable-3', target: 'np-kubeVirtNodesLiveMigratable', type: 'AGGREGATE', controller: 'NP controller', platform: 'KubeVirt' },
+  // ── KubevirtMachine VMLiveMigratable -> NodePool KubeVirtNodesLiveMigratable (direct, skips Machine) ──
+  { source: 'kvmachine-vmLiveMigratable', target: 'np-kubeVirtNodesLiveMigratable', type: 'AGGREGATE', controller: 'NP controller (reads KubevirtMachine directly)', platform: 'KubeVirt' },
 
   // ── MachineSet internal composites ──
   { source: 'ms-machinesReady', target: 'ms-ready', type: 'AGGREGATE', controller: 'CAPI MachineSet controller', sameColumn: true },
